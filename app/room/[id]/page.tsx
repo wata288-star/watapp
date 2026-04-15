@@ -13,17 +13,71 @@ export default function RoomPage() {
   const username = searchParams.get("username") || "匿名";
   const startWithVideo = searchParams.get("video") === "true";
 
+  const isAdmin = searchParams.get("admin") === "1";
+
   const [isConnected, setIsConnected] = useState(false);
   const [remoteUsername, setRemoteUsername] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(startWithVideo);
   const [connectionState, setConnectionState] = useState<string>("待機中");
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const socketIdRef = useRef<string>("");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+
+  // 管理者用：録音開始（ローカル+リモート音声をミックスして録音）
+  const startRecording = useCallback((remoteStream: MediaStream) => {
+    try {
+      const audioCtx = new AudioContext();
+      const dest = audioCtx.createMediaStreamDestination();
+
+      // リモート音声を追加
+      const remoteSource = audioCtx.createMediaStreamSource(remoteStream);
+      remoteSource.connect(dest);
+
+      // ローカル音声も追加（両方録音）
+      if (localStreamRef.current) {
+        const localAudioTracks = localStreamRef.current.getAudioTracks();
+        if (localAudioTracks.length > 0) {
+          const localAudioStream = new MediaStream(localAudioTracks);
+          const localSource = audioCtx.createMediaStreamSource(localAudioStream);
+          localSource.connect(dest);
+        }
+      }
+
+      const recorder = new MediaRecorder(dest.stream, { mimeType: "audio/webm;codecs=opus" });
+      recordedChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: "audio/webm" });
+        const url = URL.createObjectURL(blob);
+        setRecordedUrl(url);
+      };
+
+      recorder.start(1000); // 1秒ごとにデータ取得
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+    } catch (err) {
+      console.error("録音開始エラー:", err);
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  }, []);
 
   const createConnection = useCallback(
     (targetSocketId: string) => {
@@ -36,6 +90,10 @@ export default function RoomPage() {
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = stream;
           }
+          // 管理者：リモート音声受信したら自動録音開始
+          if (isAdmin && stream.getAudioTracks().length > 0) {
+            startRecording(stream);
+          }
         },
         (state) => {
           const stateMap: Record<string, string> = {
@@ -47,6 +105,10 @@ export default function RoomPage() {
           };
           setConnectionState(stateMap[state] || state);
           if (state === "connected") setIsConnected(true);
+          // 通話切断時に録音停止
+          if (state === "disconnected" || state === "failed" || state === "closed") {
+            stopRecording();
+          }
         }
       );
       if (localStreamRef.current) {
@@ -57,7 +119,7 @@ export default function RoomPage() {
       peerConnectionRef.current = pc;
       return pc;
     },
-    []
+    [isAdmin, startRecording, stopRecording]
   );
 
   useEffect(() => {
@@ -140,6 +202,9 @@ export default function RoomPage() {
       isMounted = false;
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       peerConnectionRef.current?.close();
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
       disconnectSocket();
     };
   }, [roomId, username, startWithVideo, createConnection]);
@@ -194,6 +259,7 @@ export default function RoomPage() {
   };
 
   const hangUp = () => {
+    stopRecording();
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     peerConnectionRef.current?.close();
     disconnectSocket();
@@ -219,6 +285,7 @@ export default function RoomPage() {
           <div className="flex items-center justify-center gap-1.5">
             <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-[#34d399]" : "bg-[#555]"}`} />
             <span className="text-[11px] text-[#555]">{connectionState}</span>
+            {isAdmin && isRecording && <div className="w-1.5 h-1.5 rounded-full bg-[#ef4444] animate-pulse" title="録音中" />}
           </div>
         </div>
         <div className="w-9" />
@@ -283,6 +350,22 @@ export default function RoomPage() {
           </div>
         )}
       </div>
+
+      {/* 管理者用：録音ダウンロード（通話終了後に表示） */}
+      {isAdmin && recordedUrl && (
+        <div className="flex items-center justify-center gap-3 px-4 py-2 border-t border-[#1a1a1a] bg-[#0d0d0d]">
+          <a
+            href={recordedUrl}
+            download={`watapp-recording-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.webm`}
+            className="flex items-center gap-2 px-4 py-2 bg-[#34d399]/20 text-[#34d399] rounded-lg text-sm font-medium"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            録音をダウンロード
+          </a>
+        </div>
+      )}
 
       {/* コントロール */}
       <div className="flex items-center justify-center gap-5 px-4 py-6 border-t border-[#1a1a1a]">
