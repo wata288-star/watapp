@@ -18,18 +18,32 @@ function getChatRoomId(a: string, b: string): string {
   return [a, b].sort().join("--");
 }
 
+function formatLastSeen(ts: number): string {
+  const now = Date.now();
+  const diff = now - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "たった今";
+  if (mins < 60) return `${mins}分前`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}時間前`;
+  const d = new Date(ts);
+  return d.toLocaleDateString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 export default function ChatPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
   const contactUserId = decodeURIComponent(params.name as string);
   const contactName = searchParams.get("name") || contactUserId;
+  const isAdmin = searchParams.get("admin") === "1";
 
   const [myUsername, setMyUsername] = useState("");
   const [myUserId, setMyUserId] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isOnline, setIsOnline] = useState(false);
+  const [lastSeen, setLastSeen] = useState<number | null>(null);
   const [previewMedia, setPreviewMedia] = useState<{ type: "image" | "video"; src: string } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const roomIdRef = useRef("");
@@ -127,12 +141,29 @@ export default function ChatPage() {
     socket.on("user-left", onUserLeft);
     socket.on("chat-message", onChatMessage);
 
+    // 管理者の場合、定期的に相手のステータスを確認
+    let statusInterval: ReturnType<typeof setInterval> | null = null;
+    if (isAdmin) {
+      const checkStatus = () => {
+        if (socket.connected) {
+          socket.emit("check-status", { targetUserId: contactUserId }, (res: { online: boolean; lastSeen: number | null }) => {
+            setIsOnline(res.online);
+            setLastSeen(res.lastSeen);
+          });
+        }
+      };
+      // 初回チェック + 10秒ごとにポーリング
+      setTimeout(checkStatus, 1000);
+      statusInterval = setInterval(checkStatus, 10000);
+    }
+
     // 既に接続済みならすぐにルーム参加
     if (socket.connected) {
       onConnect();
     }
 
     return () => {
+      if (statusInterval) clearInterval(statusInterval);
       // リスナーだけ外す（socketは切断しない = ホーム画面でも使い続ける）
       socket.off("connect", onConnect);
       socket.off("room-users", onRoomUsers);
@@ -205,10 +236,14 @@ export default function ChatPage() {
 
         <div className="flex-1 min-w-0">
           <div className="text-[15px] font-semibold text-white truncate">{contactName}</div>
-          <div className="flex items-center gap-1.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-[#34d399]" : "bg-[#333]"}`} />
-            <span className="text-[11px] text-[#555]">{isOnline ? "オンライン" : "オフライン"}</span>
-          </div>
+          {isAdmin && (
+            <div className="flex items-center gap-1.5">
+              <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-[#34d399]" : "bg-[#555]"}`} />
+              <span className="text-[11px] text-[#555]">
+                {isOnline ? "オンライン" : lastSeen ? `最終: ${formatLastSeen(lastSeen)}` : "オフライン"}
+              </span>
+            </div>
+          )}
         </div>
 
         <button

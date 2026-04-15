@@ -13,7 +13,7 @@ const handle = app.getRequestHandler();
 
 // ユーザーIDを生成（6桁の英数字）
 function generateUserId() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 紛らわしい文字を除外
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let id = "";
   for (let i = 0; i < 6; i++) id += chars[Math.floor(Math.random() * chars.length)];
   return id;
@@ -27,10 +27,10 @@ app.prepare().then(() => {
 
   const io = new Server(httpServer, {
     cors: { origin: "*" },
-    maxHttpBufferSize: 15e6, // 15MB（写真・動画送信用）
+    maxHttpBufferSize: 15e6,
   });
 
-  // ユーザー登録情報 { odl: { username, visitorId, socketId } }
+  // ユーザー登録情報 { userId: { username, socketId, lastSeen } }
   const users = new Map();
   // ルームごとのユーザー管理
   const rooms = new Map();
@@ -38,40 +38,33 @@ app.prepare().then(() => {
   io.on("connection", (socket) => {
     console.log(`接続: ${socket.id}`);
 
-    // ユーザー登録（名前を設定してIDを発行）
+    // ユーザー登録
     socket.on("register", ({ username, userId: existingId }, callback) => {
-      // 既存IDがあればそれを使う（再接続時）
       if (existingId && users.has(existingId)) {
         const user = users.get(existingId);
         user.socketId = socket.id;
         user.username = username;
+        user.lastSeen = Date.now();
         socket.data.userId = existingId;
         socket.data.username = username;
-        console.log(`再接続: ${username} (ID: ${existingId})`);
         callback({ userId: existingId, username });
         return;
       }
 
-      // 既存IDがあるけどサーバーに無い場合（サーバー再起動後など）→ 同じIDで再登録
       if (existingId) {
-        users.set(existingId, { username, socketId: socket.id });
+        users.set(existingId, { username, socketId: socket.id, lastSeen: Date.now() });
         socket.data.userId = existingId;
         socket.data.username = username;
-        console.log(`再登録: ${username} (ID: ${existingId})`);
         callback({ userId: existingId, username });
         return;
       }
 
-      // 新規登録
       let userId;
-      do {
-        userId = generateUserId();
-      } while (users.has(userId));
+      do { userId = generateUserId(); } while (users.has(userId));
 
-      users.set(userId, { username, socketId: socket.id });
+      users.set(userId, { username, socketId: socket.id, lastSeen: Date.now() });
       socket.data.userId = userId;
       socket.data.username = username;
-      console.log(`新規登録: ${username} (ID: ${userId})`);
       callback({ userId, username });
     });
 
@@ -85,7 +78,18 @@ app.prepare().then(() => {
       }
     });
 
-    // 連絡先追加 → 相手にも通知して自動的に連絡先を追加
+    // 相手のオンライン状態を問い合わせ（管理者用）
+    socket.on("check-status", ({ targetUserId }, callback) => {
+      const target = users.get(targetUserId);
+      if (!target) {
+        callback({ online: false, lastSeen: null });
+        return;
+      }
+      const online = !!target.socketId;
+      callback({ online, lastSeen: target.lastSeen || null });
+    });
+
+    // 連絡先追加 → 相手にも通知
     socket.on("add-contact", ({ targetUserId }, callback) => {
       const targetUser = users.get(targetUserId);
       const myUserId = socket.data.userId;
@@ -96,7 +100,6 @@ app.prepare().then(() => {
         return;
       }
 
-      // 相手がオンラインなら通知を送る
       if (targetUser.socketId) {
         io.to(targetUser.socketId).emit("contact-added", {
           userId: myUserId,
@@ -105,12 +108,10 @@ app.prepare().then(() => {
       }
 
       callback({ success: true });
-      console.log(`${myUsername} (${myUserId}) → ${targetUser.username} (${targetUserId}) を連絡先に追加`);
     });
 
     // ルームに参加
     socket.on("join-room", ({ roomId, username }) => {
-      // 前のルームから退出
       if (socket.data.roomId && socket.data.roomId !== roomId) {
         const prevRoom = rooms.get(socket.data.roomId);
         if (prevRoom) {
@@ -134,13 +135,11 @@ app.prepare().then(() => {
       const room = rooms.get(roomId);
       room.set(socket.id, username);
 
-      // 部屋の他のユーザーに通知
       socket.to(roomId).emit("user-joined", {
         socketId: socket.id,
         username,
       });
 
-      // 既存ユーザー一覧を送信
       const roomUsers = [];
       room.forEach((name, id) => {
         if (id !== socket.id) {
@@ -148,36 +147,22 @@ app.prepare().then(() => {
         }
       });
       socket.emit("room-users", roomUsers);
-
-      console.log(`${username} がルーム ${roomId} に参加 (現在 ${room.size}人)`);
     });
 
-    // WebRTC シグナリング: オファー送信
+    // WebRTC シグナリング
     socket.on("offer", ({ to, offer }) => {
-      socket.to(to).emit("offer", {
-        from: socket.id,
-        offer,
-        username: socket.data.username,
-      });
+      socket.to(to).emit("offer", { from: socket.id, offer, username: socket.data.username });
     });
 
-    // WebRTC シグナリング: アンサー送信
     socket.on("answer", ({ to, answer }) => {
-      socket.to(to).emit("answer", {
-        from: socket.id,
-        answer,
-      });
+      socket.to(to).emit("answer", { from: socket.id, answer });
     });
 
-    // WebRTC シグナリング: ICE候補送信
     socket.on("ice-candidate", ({ to, candidate }) => {
-      socket.to(to).emit("ice-candidate", {
-        from: socket.id,
-        candidate,
-      });
+      socket.to(to).emit("ice-candidate", { from: socket.id, candidate });
     });
 
-    // チャットメッセージ送信（テキスト / 画像 / 動画）
+    // チャットメッセージ送信
     socket.on("chat-message", ({ roomId, message, type, fileData, fileName }) => {
       io.to(roomId).emit("chat-message", {
         username: socket.data.username,
@@ -196,19 +181,13 @@ app.prepare().then(() => {
       if (roomId && rooms.has(roomId)) {
         const room = rooms.get(roomId);
         room.delete(socket.id);
-        if (room.size === 0) {
-          rooms.delete(roomId);
-        }
-        socket.to(roomId).emit("user-left", {
-          socketId: socket.id,
-          username,
-        });
-        console.log(`${username} がルーム ${roomId} から退出`);
+        if (room.size === 0) rooms.delete(roomId);
+        socket.to(roomId).emit("user-left", { socketId: socket.id, username });
       }
-      // ユーザー情報はそのまま保持（再接続用）
-      // ただしsocketIdはクリア
       if (userId && users.has(userId)) {
-        users.get(userId).socketId = null;
+        const user = users.get(userId);
+        user.socketId = null;
+        user.lastSeen = Date.now();
       }
     });
   });

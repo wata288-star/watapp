@@ -24,9 +24,12 @@ export default function Home() {
   const [searchError, setSearchError] = useState("");
   const [showMyId, setShowMyId] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ userId: string; username: string } | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // 保存済みデータを復元
   useEffect(() => {
+    const savedAdmin = localStorage.getItem("watapp-admin");
+    if (savedAdmin === "true") setIsAdmin(true);
     const savedName = localStorage.getItem("watapp-username");
     const savedId = localStorage.getItem("watapp-userId");
     if (savedName && savedId) {
@@ -144,7 +147,8 @@ export default function Home() {
   }, [searchResult, contacts, addContactToList]);
 
   const openChat = (contact: Contact) => {
-    router.push(`/chat/${encodeURIComponent(contact.userId)}?name=${encodeURIComponent(contact.username)}`);
+    const adminParam = isAdmin ? "&admin=1" : "";
+    router.push(`/chat/${encodeURIComponent(contact.userId)}?name=${encodeURIComponent(contact.username)}${adminParam}`);
   };
 
   // トーク履歴を削除
@@ -289,6 +293,20 @@ export default function Home() {
               コピー
             </button>
           </div>
+          {/* 管理者モード */}
+          <button
+            onClick={() => {
+              const next = !isAdmin;
+              setIsAdmin(next);
+              localStorage.setItem("watapp-admin", String(next));
+            }}
+            className="flex items-center gap-2 mt-3"
+          >
+            <div className={`w-10 h-6 rounded-full transition-colors ${isAdmin ? "bg-[#34d399]" : "bg-[#333]"}`}>
+              <div className={`w-5 h-5 bg-white rounded-full mt-0.5 transition-transform ${isAdmin ? "translate-x-[18px]" : "translate-x-0.5"}`} />
+            </div>
+            <span className="text-xs text-[#666]">管理者モード（相手のステータスを表示）</span>
+          </button>
         </div>
       )}
 
