@@ -25,6 +25,9 @@ export default function Home() {
   const [showMyId, setShowMyId] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ userId: string; username: string } | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminCode, setAdminCode] = useState("");
+  const [showAdminInput, setShowAdminInput] = useState(false);
+  const [idTapCount, setIdTapCount] = useState(0);
 
   // 保存済みデータを復元
   useEffect(() => {
@@ -281,9 +284,16 @@ export default function Home() {
         <div className="px-5 py-4 border-b border-[#1a1a1a] bg-[#0d0d0d]">
           <p className="text-xs text-[#666] mb-2">あなたのID（相手に教えてね）</p>
           <div className="flex items-center gap-3">
-            <div className="flex-1 px-4 py-3 bg-[#141414] border border-[#222] rounded-xl">
+            <button
+              onClick={() => {
+                const next = idTapCount + 1;
+                setIdTapCount(next);
+                if (next >= 5) setShowAdminInput(true);
+              }}
+              className="flex-1 px-4 py-3 bg-[#141414] border border-[#222] rounded-xl text-left"
+            >
               <span className="text-[22px] font-mono font-bold text-white tracking-[6px]">{myUserId}</span>
-            </div>
+            </button>
             <button
               onClick={() => {
                 navigator.clipboard?.writeText(myUserId);
@@ -293,20 +303,52 @@ export default function Home() {
               コピー
             </button>
           </div>
-          {/* 管理者モード */}
-          <button
-            onClick={() => {
-              const next = !isAdmin;
-              setIsAdmin(next);
-              localStorage.setItem("watapp-admin", String(next));
-            }}
-            className="flex items-center gap-2 mt-3"
-          >
-            <div className={`w-10 h-6 rounded-full transition-colors ${isAdmin ? "bg-[#34d399]" : "bg-[#333]"}`}>
-              <div className={`w-5 h-5 bg-white rounded-full mt-0.5 transition-transform ${isAdmin ? "translate-x-[18px]" : "translate-x-0.5"}`} />
+          {/* 管理者モード：IDを5回タップで入力欄表示、1919で解除 */}
+          {isAdmin && (
+            <div className="flex items-center gap-2 mt-3">
+              <div className="w-2 h-2 rounded-full bg-[#34d399]" />
+              <span className="text-xs text-[#444]">管理者モード</span>
+              <button
+                onClick={() => { setIsAdmin(false); localStorage.removeItem("watapp-admin"); }}
+                className="text-xs text-[#333] ml-auto hover:text-[#666] transition"
+              >
+                解除
+              </button>
             </div>
-            <span className="text-xs text-[#666]">管理者モード（相手のステータスを表示）</span>
-          </button>
+          )}
+          {showAdminInput && !isAdmin && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (adminCode === "1919") {
+                  setIsAdmin(true);
+                  localStorage.setItem("watapp-admin", "true");
+                  setShowAdminInput(false);
+                  setAdminCode("");
+                  setIdTapCount(0);
+                } else {
+                  setAdminCode("");
+                }
+              }}
+              className="flex items-center gap-2 mt-3"
+            >
+              <input
+                type="password"
+                value={adminCode}
+                onChange={(e) => setAdminCode(e.target.value)}
+                placeholder="コード"
+                maxLength={4}
+                className="w-24 px-3 py-2 bg-[#141414] border border-[#222] rounded-lg text-white text-sm font-mono tracking-[2px] placeholder-[#333] outline-none focus:border-[#444] transition text-center"
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="px-3 py-2 bg-[#1a1a1a] border border-[#222] rounded-lg text-xs text-[#555] hover:bg-[#222] transition"
+              >
+                OK
+              </button>
+            </form>
+          )}
         </div>
       )}
 
