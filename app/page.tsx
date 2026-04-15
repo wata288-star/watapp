@@ -31,6 +31,9 @@ export default function Home() {
   const [editingId, setEditingId] = useState(false);
   const [newIdInput, setNewIdInput] = useState("");
   const [idError, setIdError] = useState("");
+  const [loginMode, setLoginMode] = useState<"new" | "id">("new");
+  const [loginId, setLoginId] = useState("");
+  const [loginError, setLoginError] = useState("");
 
   // 管理者IDリスト（これらのIDは自動的に管理者権限を持つ）
   const ADMIN_IDS = ["WATARU"];
@@ -173,6 +176,43 @@ export default function Home() {
     setShowAdd(false);
   }, [searchResult, contacts, addContactToList]);
 
+  // IDでログイン
+  const loginWithId = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    const id = loginId.trim().toUpperCase();
+    if (!id) return;
+    setLoginError("");
+    setIsRegistering(true);
+
+    const socket = connectSocket();
+    const doLogin = () => {
+      socket.off("connect", doLogin);
+      socket.emit("find-user", { userId: id }, (res: { found: boolean; userId?: string; username?: string }) => {
+        if (res.found && res.userId && res.username) {
+          // 見つかったらそのIDでregister
+          socket.emit("register", { username: res.username, userId: res.userId }, (regRes: { userId: string; username: string }) => {
+            setMyUserId(regRes.userId);
+            setMyUsername(regRes.username);
+            localStorage.setItem("watapp-username", regRes.username);
+            localStorage.setItem("watapp-userId", regRes.userId);
+            localStorage.removeItem("watapp-loggedOut");
+            if (ADMIN_IDS.includes(regRes.userId)) {
+              setIsAdmin(true);
+              localStorage.setItem("watapp-admin", "true");
+            }
+            setIsSetup(true);
+            setIsRegistering(false);
+          });
+        } else {
+          setLoginError("このIDのアカウントは見つかりません");
+          setIsRegistering(false);
+        }
+      });
+    };
+    socket.on("connect", doLogin);
+    if (socket.connected) doLogin();
+  }, [loginId]);
+
   // ID変更
   const changeId = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -242,36 +282,79 @@ export default function Home() {
     return d.toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
   };
 
-  // ユーザー名設定画面（初回のみ）
+  // ログイン / 新規登録画面
   if (!isSetup) {
     return (
       <main className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          <div className="text-center mb-10">
+          <div className="text-center mb-8">
             <h1 className="text-[32px] font-extrabold tracking-tight text-white">Watapp</h1>
             <p className="text-[#666] text-sm mt-1">通話・チャット</p>
           </div>
-          <form onSubmit={register}>
-            <div className="mb-6">
-              <label className="block text-xs text-[#888] mb-1.5">あなたの名前</label>
-              <input
-                type="text"
-                value={myUsername}
-                onChange={(e) => setMyUsername(e.target.value)}
-                placeholder="名前を入力"
-                className="w-full px-4 py-3.5 bg-[#141414] border border-[#222] rounded-xl text-white text-[15px] placeholder-[#444] outline-none focus:border-[#444] transition"
-                required
-                autoFocus
-              />
-            </div>
+
+          {/* タブ切り替え */}
+          <div className="flex mb-6 bg-[#141414] rounded-xl p-1">
             <button
-              type="submit"
-              disabled={!myUsername.trim() || isRegistering}
-              className="w-full py-4 bg-white text-black font-bold text-base rounded-[14px] hover:opacity-85 disabled:opacity-30 disabled:cursor-not-allowed transition"
+              onClick={() => { setLoginMode("new"); setLoginError(""); }}
+              className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition ${loginMode === "new" ? "bg-white text-black" : "text-[#666]"}`}
             >
-              {isRegistering ? "登録中..." : "はじめる"}
+              新規登録
             </button>
-          </form>
+            <button
+              onClick={() => { setLoginMode("id"); setLoginError(""); }}
+              className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition ${loginMode === "id" ? "bg-white text-black" : "text-[#666]"}`}
+            >
+              IDでログイン
+            </button>
+          </div>
+
+          {loginMode === "new" ? (
+            <form onSubmit={register}>
+              <div className="mb-6">
+                <label className="block text-xs text-[#888] mb-1.5">あなたの名前</label>
+                <input
+                  type="text"
+                  value={myUsername}
+                  onChange={(e) => setMyUsername(e.target.value)}
+                  placeholder="名前を入力"
+                  className="w-full px-4 py-3.5 bg-[#141414] border border-[#222] rounded-xl text-white text-[15px] placeholder-[#444] outline-none focus:border-[#444] transition"
+                  required
+                  autoFocus
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={!myUsername.trim() || isRegistering}
+                className="w-full py-4 bg-white text-black font-bold text-base rounded-[14px] hover:opacity-85 disabled:opacity-30 disabled:cursor-not-allowed transition"
+              >
+                {isRegistering ? "登録中..." : "はじめる"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={loginWithId}>
+              <div className="mb-6">
+                <label className="block text-xs text-[#888] mb-1.5">あなたのID</label>
+                <input
+                  type="text"
+                  value={loginId}
+                  onChange={(e) => { setLoginId(e.target.value.toUpperCase()); setLoginError(""); }}
+                  placeholder="IDを入力"
+                  maxLength={8}
+                  className="w-full px-4 py-3.5 bg-[#141414] border border-[#222] rounded-xl text-white text-[17px] font-mono tracking-[4px] placeholder-[#444] outline-none focus:border-[#444] transition"
+                  required
+                  autoFocus
+                />
+                {loginError && <p className="text-xs text-[#ef4444] mt-2">{loginError}</p>}
+              </div>
+              <button
+                type="submit"
+                disabled={!loginId.trim() || isRegistering}
+                className="w-full py-4 bg-white text-black font-bold text-base rounded-[14px] hover:opacity-85 disabled:opacity-30 disabled:cursor-not-allowed transition"
+              >
+                {isRegistering ? "ログイン中..." : "ログイン"}
+              </button>
+            </form>
+          )}
         </div>
       </main>
     );
