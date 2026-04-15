@@ -83,6 +83,25 @@ app.prepare().then(() => {
       callback({ online: !!target.socketId, lastSeen: target.lastSeen || null });
     });
 
+    // ID変更
+    socket.on("change-id", ({ oldId, newId }, callback) => {
+      const id = newId.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (id.length < 3 || id.length > 8) { callback({ success: false, error: "IDは3〜8文字で入力してください" }); return; }
+      if (id === oldId) { callback({ success: false, error: "現在のIDと同じです" }); return; }
+      if (users.has(id)) { callback({ success: false, error: "このIDはすでに使われています" }); return; }
+
+      // 旧IDのデータを新IDに移行
+      const userData = users.get(oldId);
+      if (userData) {
+        users.delete(oldId);
+        users.set(id, userData);
+      } else {
+        users.set(id, { username: socket.data.username, socketId: socket.id, lastSeen: Date.now() });
+      }
+      socket.data.userId = id;
+      callback({ success: true, newId: id });
+    });
+
     socket.on("add-contact", ({ targetUserId }, callback) => {
       const targetUser = users.get(targetUserId);
       const myUserId = socket.data.userId;

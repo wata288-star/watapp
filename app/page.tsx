@@ -28,6 +28,9 @@ export default function Home() {
   const [adminCode, setAdminCode] = useState("");
   const [showAdminInput, setShowAdminInput] = useState(false);
   const [idTapCount, setIdTapCount] = useState(0);
+  const [editingId, setEditingId] = useState(false);
+  const [newIdInput, setNewIdInput] = useState("");
+  const [idError, setIdError] = useState("");
 
   // 保存済みデータを復元
   useEffect(() => {
@@ -157,6 +160,27 @@ export default function Home() {
     setSearchResult(null);
     setShowAdd(false);
   }, [searchResult, contacts, addContactToList]);
+
+  // ID変更
+  const changeId = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    const id = newIdInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (id.length < 3 || id.length > 8) { setIdError("IDは3〜8文字の英数字で入力してね"); return; }
+    setIdError("");
+
+    const socket = getSocket();
+    socket.emit("change-id", { oldId: myUserId, newId: id }, (res: { success: boolean; newId?: string; error?: string }) => {
+      if (res.success && res.newId) {
+        setMyUserId(res.newId);
+        localStorage.setItem("watapp-userId", res.newId);
+        setEditingId(false);
+        setNewIdInput("");
+        setIdError("");
+      } else {
+        setIdError(res.error || "変更できませんでした");
+      }
+    });
+  }, [newIdInput, myUserId]);
 
   const openChat = (contact: Contact) => {
     const adminParam = isAdmin ? "&admin=1" : "";
@@ -305,14 +329,46 @@ export default function Home() {
               <span className="text-[22px] font-mono font-bold text-white tracking-[6px]">{myUserId}</span>
             </button>
             <button
-              onClick={() => {
-                navigator.clipboard?.writeText(myUserId);
-              }}
+              onClick={() => { navigator.clipboard?.writeText(myUserId); }}
               className="px-4 py-3 bg-[#1a1a1a] border border-[#222] rounded-xl text-sm text-[#888] hover:bg-[#222] transition"
             >
               コピー
             </button>
+            <button
+              onClick={() => { setEditingId(!editingId); setNewIdInput(""); setIdError(""); }}
+              className="px-3 py-3 bg-[#1a1a1a] border border-[#222] rounded-xl text-sm text-[#888] hover:bg-[#222] transition"
+              title="ID変更"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+              </svg>
+            </button>
           </div>
+          {/* ID変更フォーム */}
+          {editingId && (
+            <form onSubmit={changeId} className="mt-3">
+              <p className="text-[11px] text-[#555] mb-1.5">新しいID（3〜8文字、英数字）</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newIdInput}
+                  onChange={(e) => { setNewIdInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")); setIdError(""); }}
+                  placeholder="例: WATARU"
+                  maxLength={8}
+                  className="flex-1 px-3 py-2.5 bg-[#141414] border border-[#222] rounded-lg text-white text-base font-mono tracking-[3px] placeholder-[#333] outline-none focus:border-[#444] transition"
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  disabled={newIdInput.length < 3}
+                  className="px-4 py-2.5 bg-white text-black font-bold text-sm rounded-lg hover:opacity-85 disabled:opacity-30 transition"
+                >
+                  変更
+                </button>
+              </div>
+              {idError && <p className="text-xs text-[#ef4444] mt-1.5">{idError}</p>}
+            </form>
+          )}
           {/* 管理者モード：IDを5回タップで入力欄表示、1919で解除 */}
           {isAdmin && (
             <div className="flex items-center gap-2 mt-3">
