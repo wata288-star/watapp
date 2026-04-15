@@ -29,6 +29,20 @@ app.prepare().then(() => {
 
     // ルームに参加
     socket.on("join-room", ({ roomId, username }) => {
+      // 前のルームから退出
+      if (socket.data.roomId && socket.data.roomId !== roomId) {
+        const prevRoom = rooms.get(socket.data.roomId);
+        if (prevRoom) {
+          prevRoom.delete(socket.id);
+          if (prevRoom.size === 0) rooms.delete(socket.data.roomId);
+          socket.to(socket.data.roomId).emit("user-left", {
+            socketId: socket.id,
+            username: socket.data.username,
+          });
+        }
+        socket.leave(socket.data.roomId);
+      }
+
       socket.join(roomId);
       socket.data.roomId = roomId;
       socket.data.username = username;
@@ -54,7 +68,7 @@ app.prepare().then(() => {
       });
       socket.emit("room-users", users);
 
-      console.log(`${username} がルーム ${roomId} に参加`);
+      console.log(`${username} がルーム ${roomId} に参加 (現在 ${room.size}人)`);
     });
 
     // WebRTC シグナリング: オファー送信

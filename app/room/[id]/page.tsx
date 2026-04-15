@@ -5,44 +5,25 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
 import { createPeerConnection, getUserMedia, createOffer, createAnswer } from "@/lib/webrtc";
 
-interface ChatMessage {
-  username: string;
-  message: string;
-  timestamp: number;
-  socketId: string;
-}
-
 export default function RoomPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
   const roomId = params.id as string;
   const username = searchParams.get("username") || "匿名";
+  const startWithVideo = searchParams.get("video") === "true";
 
   const [isConnected, setIsConnected] = useState(false);
   const [remoteUsername, setRemoteUsername] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [newMessage, setNewMessage] = useState("");
+  const [isVideoOn, setIsVideoOn] = useState(startWithVideo);
   const [connectionState, setConnectionState] = useState<string>("待機中");
-  const [unreadCount, setUnreadCount] = useState(0);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
   const socketIdRef = useRef<string>("");
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  useEffect(() => {
-    if (isChatOpen) setUnreadCount(0);
-  }, [isChatOpen]);
 
   const createConnection = useCallback(
     (targetSocketId: string) => {
@@ -59,7 +40,7 @@ export default function RoomPage() {
         (state) => {
           const stateMap: Record<string, string> = {
             connecting: "接続中...",
-            connected: "接続済み",
+            connected: "通話中",
             disconnected: "切断",
             failed: "接続失敗",
             closed: "終了",
@@ -83,7 +64,8 @@ export default function RoomPage() {
     let isMounted = true;
     const init = async () => {
       try {
-        const stream = await getUserMedia(true, true);
+        // デフォルトは音声のみ。ビデオはパラメータで指定された場合のみ
+        const stream = await getUserMedia(startWithVideo, true);
         localStreamRef.current = stream;
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
@@ -127,17 +109,6 @@ export default function RoomPage() {
           }
         });
 
-        socket.on("chat-message", (msg: ChatMessage) => {
-          if (!isMounted) return;
-          setMessages((prev) => [...prev, msg]);
-          setIsChatOpen((open) => {
-            if (!open && msg.socketId !== socketIdRef.current) {
-              setUnreadCount((c) => c + 1);
-            }
-            return open;
-          });
-        });
-
         socket.on("user-left", ({ username: remName }) => {
           if (!isMounted) return;
           setRemoteUsername(null);
@@ -160,7 +131,7 @@ export default function RoomPage() {
           setConnectionState("相手を待っています...");
         }
       } catch {
-        if (isMounted) setConnectionState("カメラ/マイクへのアクセスが拒否されました");
+        if (isMounted) setConnectionState("マイクへのアクセスが拒否されました");
       }
     };
 
@@ -171,202 +142,183 @@ export default function RoomPage() {
       peerConnectionRef.current?.close();
       disconnectSocket();
     };
-  }, [roomId, username, createConnection]);
+  }, [roomId, username, startWithVideo, createConnection]);
 
   const toggleMute = () => {
     localStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = !t.enabled; });
     setIsMuted(!isMuted);
   };
 
-  const toggleVideo = () => {
-    localStreamRef.current?.getVideoTracks().forEach((t) => { t.enabled = !t.enabled; });
-    setIsVideoOff(!isVideoOff);
+  const toggleVideo = async () => {
+    if (!isVideoOn) {
+      // ビデオON: カメラ取得してトラック追加
+      try {
+        const videoStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+        });
+        const videoTrack = videoStream.getVideoTracks()[0];
+
+        // ローカルストリームに追加
+        localStreamRef.current?.addTrack(videoTrack);
+        if (localVideoRef.current && localStreamRef.current) {
+          localVideoRef.current.srcObject = localStreamRef.current;
+        }
+
+        // PeerConnectionにトラック追加
+        if (peerConnectionRef.current && localStreamRef.current) {
+          peerConnectionRef.current.addTrack(videoTrack, localStreamRef.current);
+        }
+
+        setIsVideoOn(true);
+      } catch (err) {
+        console.error("カメラ取得に失敗:", err);
+      }
+    } else {
+      // ビデオOFF: カメラトラック停止・削除
+      localStreamRef.current?.getVideoTracks().forEach((t) => {
+        t.stop();
+        localStreamRef.current?.removeTrack(t);
+      });
+
+      if (peerConnectionRef.current) {
+        const senders = peerConnectionRef.current.getSenders();
+        senders.forEach((sender) => {
+          if (sender.track?.kind === "video") {
+            peerConnectionRef.current?.removeTrack(sender);
+          }
+        });
+      }
+
+      setIsVideoOn(false);
+    }
   };
 
   const hangUp = () => {
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     peerConnectionRef.current?.close();
     disconnectSocket();
-    router.push("/");
-  };
-
-  const sendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim()) return;
-    getSocket().emit("chat-message", { roomId, message: newMessage.trim() });
-    setNewMessage("");
+    router.back();
   };
 
   return (
     <div className="flex-1 flex flex-col h-dvh overflow-hidden bg-[#0a0a0a]">
       {/* ヘッダー */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a]">
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-[#34d399]" : "bg-[#666]"}`} />
-          <div>
-            <div className="text-[13px] font-semibold text-white">{roomId}</div>
-            <div className="text-[11px] text-[#666]">{connectionState}</div>
+        <button
+          onClick={hangUp}
+          className="w-9 h-9 flex items-center justify-center text-[#888] hover:text-white transition"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+        </button>
+        <div className="text-center">
+          <div className="text-[15px] font-semibold text-white">
+            {remoteUsername || "通話"}
+          </div>
+          <div className="flex items-center justify-center gap-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-[#34d399]" : "bg-[#555]"}`} />
+            <span className="text-[11px] text-[#555]">{connectionState}</span>
           </div>
         </div>
-        {remoteUsername && (
-          <div className="text-xs text-[#888]">{remoteUsername}</div>
-        )}
+        <div className="w-9" />
       </header>
 
-      {/* メイン */}
-      <div className="flex-1 flex relative overflow-hidden">
-        {/* ビデオエリア */}
-        <div className={`flex-1 flex flex-col p-2 ${isChatOpen ? "hidden sm:flex" : ""}`}>
-          <div className="flex-1 relative bg-[#111] rounded-2xl overflow-hidden">
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="w-full h-full object-cover"
-            />
-            {!isConnected && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="w-20 h-20 bg-[#1a1a1a] rounded-full flex items-center justify-center text-[32px] font-bold text-[#444]">
-                  ?
-                </div>
-                <p className="text-[13px] text-[#444] mt-3">相手を待っています...</p>
-              </div>
-            )}
-            {remoteUsername && isConnected && (
-              <div className="absolute bottom-3 left-3 bg-black/60 px-3 py-1 rounded-lg text-xs text-white">
-                {remoteUsername}
-              </div>
-            )}
-          </div>
-
-          {/* 自分の映像 */}
-          <div className="absolute top-16 right-4 w-20 h-[110px] z-10">
-            <div className="relative w-full h-full rounded-xl overflow-hidden border border-[#222] bg-[#1a1a1a]">
+      {/* メインエリア */}
+      <div className="flex-1 flex items-center justify-center relative">
+        {isVideoOn ? (
+          <>
+            {/* リモートビデオ */}
+            <div className="w-full h-full bg-[#111] relative">
               <video
-                ref={localVideoRef}
+                ref={remoteVideoRef}
                 autoPlay
                 playsInline
-                muted
                 className="w-full h-full object-cover"
               />
-              {isVideoOff && (
-                <div className="absolute inset-0 bg-[#141414] flex items-center justify-center">
-                  <span className="text-sm font-bold text-[#444]">OFF</span>
+              {!isConnected && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <div className="w-20 h-20 bg-[#1a1a1a] rounded-full flex items-center justify-center text-[32px] font-bold text-[#444]">
+                    {remoteUsername ? remoteUsername.charAt(0).toUpperCase() : "?"}
+                  </div>
+                  <p className="text-[13px] text-[#444] mt-3">{connectionState}</p>
                 </div>
               )}
-              <div className="absolute bottom-1 left-0 right-0 text-center text-[9px] text-[#888]">
-                {username}
+            </div>
+
+            {/* ローカルビデオ（小窓） */}
+            <div className="absolute top-4 right-4 w-24 h-32 z-10">
+              <div className="relative w-full h-full rounded-xl overflow-hidden border border-[#222] bg-[#1a1a1a]">
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                />
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* チャットパネル */}
-        {isChatOpen && (
-          <div className="w-full sm:w-80 flex flex-col bg-[#0a0a0a] border-l border-[#1a1a1a]">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a]">
-              <span className="text-sm font-semibold text-white">チャット</span>
-              <button onClick={() => setIsChatOpen(false)} className="text-[#666] hover:text-white transition">
-                ✕
-              </button>
+          </>
+        ) : (
+          /* 音声通話UI */
+          <div className="flex flex-col items-center justify-center">
+            <div className="w-28 h-28 bg-[#1a1a1a] rounded-full flex items-center justify-center mb-5">
+              <span className="text-[42px] font-bold text-[#444]">
+                {remoteUsername ? remoteUsername.charAt(0).toUpperCase() : "?"}
+              </span>
             </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {messages.length === 0 && (
-                <p className="text-xs text-[#444] text-center mt-8">メッセージなし</p>
-              )}
-              {messages.map((msg, i) => {
-                const isOwn = msg.socketId === socketIdRef.current;
-                return (
-                  <div key={i} className={`flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
-                    <span className="text-[10px] text-[#555] mb-1">{msg.username}</span>
-                    <div
-                      className={`max-w-[75%] px-3.5 py-2.5 text-sm leading-relaxed ${
-                        isOwn
-                          ? "bg-white text-black rounded-2xl rounded-br-sm"
-                          : "bg-[#1a1a1a] text-[#ccc] rounded-2xl rounded-bl-sm"
-                      }`}
-                    >
-                      {msg.message}
-                    </div>
-                    <span className="text-[10px] text-[#333] mt-1">
-                      {new Date(msg.timestamp).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                );
-              })}
-              <div ref={chatEndRef} />
-            </div>
-
-            <form onSubmit={sendMessage} className="flex gap-2 p-3 border-t border-[#1a1a1a]">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="メッセージ..."
-                className="flex-1 px-4 py-3 bg-[#141414] border border-[#222] rounded-xl text-white text-sm placeholder-[#444] outline-none focus:border-[#444] transition"
-              />
-              <button
-                type="submit"
-                disabled={!newMessage.trim()}
-                className="w-11 h-11 bg-white rounded-xl text-black flex items-center justify-center disabled:opacity-30 transition"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                </svg>
-              </button>
-            </form>
+            <h2 className="text-xl font-semibold text-white mb-1">
+              {remoteUsername || "発信中..."}
+            </h2>
+            <p className="text-sm text-[#555]">{connectionState}</p>
+            {isConnected && (
+              <div className="flex items-center gap-1.5 mt-3">
+                <div className="w-2 h-2 rounded-full bg-[#34d399] animate-pulse" />
+                <span className="text-xs text-[#34d399]">通話中</span>
+              </div>
+            )}
+            {/* 非表示のvideoタグ（音声再生用） */}
+            <video ref={remoteVideoRef} autoPlay playsInline className="hidden" />
+            <video ref={localVideoRef} autoPlay playsInline muted className="hidden" />
           </div>
         )}
       </div>
 
       {/* コントロール */}
-      <div className="flex items-center justify-center gap-5 px-4 py-4 border-t border-[#1a1a1a]">
+      <div className="flex items-center justify-center gap-5 px-4 py-6 border-t border-[#1a1a1a]">
         <button
           onClick={toggleMute}
-          className={`w-[52px] h-[52px] rounded-full flex items-center justify-center transition ${
-            isMuted ? "bg-[#1a1a1a] text-[#ef4444]" : "bg-[#1a1a1a] text-white hover:bg-[#222]"
+          className={`w-14 h-14 rounded-full flex items-center justify-center transition ${
+            isMuted ? "bg-[#ef4444]/20 text-[#ef4444]" : "bg-[#1a1a1a] text-white hover:bg-[#222]"
           }`}
         >
-          <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            {isMuted ? (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 19L5 5m14 0l-2.5 2.5M12 18.75a6 6 0 005.942-5.193M12 18.75v3.75m-3.75 0h7.5M12 15.75A3 3 0 019 12.75v-1.5M15 9.75v3a3 3 0 01-.879 2.121" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+            )}
           </svg>
         </button>
 
         <button
           onClick={toggleVideo}
-          className={`w-[52px] h-[52px] rounded-full flex items-center justify-center transition ${
-            isVideoOff ? "bg-[#1a1a1a] text-[#ef4444]" : "bg-[#1a1a1a] text-white hover:bg-[#222]"
+          className={`w-14 h-14 rounded-full flex items-center justify-center transition ${
+            isVideoOn ? "bg-white text-black" : "bg-[#1a1a1a] text-[#888] hover:bg-[#222]"
           }`}
         >
-          <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
         </button>
 
         <button
           onClick={hangUp}
-          className="w-[52px] h-[52px] bg-[#ef4444] rounded-full flex items-center justify-center text-white transition hover:bg-[#dc2626]"
+          className="w-14 h-14 bg-[#ef4444] rounded-full flex items-center justify-center text-white transition hover:bg-[#dc2626]"
         >
-          <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
           </svg>
-        </button>
-
-        <button
-          onClick={() => setIsChatOpen(!isChatOpen)}
-          className={`w-[52px] h-[52px] rounded-full flex items-center justify-center transition relative ${
-            isChatOpen ? "bg-white text-black" : "bg-[#1a1a1a] text-white hover:bg-[#222]"
-          }`}
-        >
-          <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
-          </svg>
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-[18px] h-[18px] bg-[#ef4444] rounded-full text-[10px] flex items-center justify-center text-white font-bold">
-              {unreadCount}
-            </span>
-          )}
         </button>
       </div>
     </div>
