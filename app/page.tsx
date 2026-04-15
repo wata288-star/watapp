@@ -23,6 +23,7 @@ export default function Home() {
   const [searchResult, setSearchResult] = useState<{ found: boolean; userId?: string; username?: string } | null>(null);
   const [searchError, setSearchError] = useState("");
   const [showMyId, setShowMyId] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ userId: string; username: string } | null>(null);
 
   // 保存済みデータを復元
   useEffect(() => {
@@ -145,6 +146,34 @@ export default function Home() {
   const openChat = (contact: Contact) => {
     router.push(`/chat/${encodeURIComponent(contact.userId)}?name=${encodeURIComponent(contact.username)}`);
   };
+
+  // トーク履歴を削除
+  const deleteChatHistory = useCallback((contact: Contact) => {
+    const roomId = [myUserId, contact.userId].sort().join("--");
+    localStorage.removeItem(`watapp-chat-${roomId}`);
+    // lastMessageもクリア
+    setContacts((prev) => {
+      const updated = prev.map((c) =>
+        c.userId === contact.userId ? { ...c, lastMessage: undefined, lastTime: undefined } : c
+      );
+      localStorage.setItem("watapp-contacts", JSON.stringify(updated));
+      return updated;
+    });
+    setContextMenu(null);
+  }, [myUserId]);
+
+  // フレンドを削除
+  const deleteContact = useCallback((userId: string) => {
+    setContacts((prev) => {
+      const updated = prev.filter((c) => c.userId !== userId);
+      localStorage.setItem("watapp-contacts", JSON.stringify(updated));
+      return updated;
+    });
+    // チャット履歴も一緒に消す
+    const roomId = [myUserId, userId].sort().join("--");
+    localStorage.removeItem(`watapp-chat-${roomId}`);
+    setContextMenu(null);
+  }, [myUserId]);
 
   const formatTime = (ts?: number) => {
     if (!ts) return "";
@@ -329,31 +358,84 @@ export default function Home() {
           </div>
         ) : (
           contacts.map((contact) => (
-            <button
-              key={contact.userId}
-              onClick={() => openChat(contact)}
-              className="w-full flex items-center gap-3.5 px-5 py-4 hover:bg-[#111] active:bg-[#151515] transition text-left border-b border-[#111]"
-            >
-              <div className="w-12 h-12 bg-[#1a1a1a] rounded-full flex items-center justify-center shrink-0">
-                <span className="text-lg font-bold text-[#555]">
-                  {contact.username.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-[15px] font-medium text-white">{contact.username}</span>
-                  {contact.lastTime && (
-                    <span className="text-[11px] text-[#444]">{formatTime(contact.lastTime)}</span>
-                  )}
+            <div key={contact.userId} className="relative border-b border-[#111]">
+              <button
+                onClick={() => openChat(contact)}
+                onContextMenu={(e) => { e.preventDefault(); setContextMenu({ userId: contact.userId, username: contact.username }); }}
+                className="w-full flex items-center gap-3.5 px-5 py-4 hover:bg-[#111] active:bg-[#151515] transition text-left"
+              >
+                <div className="w-12 h-12 bg-[#1a1a1a] rounded-full flex items-center justify-center shrink-0">
+                  <span className="text-lg font-bold text-[#555]">
+                    {contact.username.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[15px] font-medium text-white">{contact.username}</span>
+                    {contact.lastTime && (
+                      <span className="text-[11px] text-[#444]">{formatTime(contact.lastTime)}</span>
+                    )}
                 </div>
                 <p className="text-sm text-[#555] truncate mt-0.5">
                   {contact.lastMessage || "チャットを始めよう"}
                 </p>
               </div>
-            </button>
+              </button>
+              {/* メニューボタン（3点） */}
+              <button
+                onClick={(e) => { e.stopPropagation(); setContextMenu(contextMenu?.userId === contact.userId ? null : { userId: contact.userId, username: contact.username }); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-[#444] hover:text-[#888] transition"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                </svg>
+              </button>
+            </div>
           ))
         )}
       </div>
+
+      {/* コンテキストメニュー（オーバーレイ） */}
+      {contextMenu && (
+        <div className="fixed inset-0 z-50" onClick={() => setContextMenu(null)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="absolute bottom-0 left-0 right-0 bg-[#1a1a1a] rounded-t-2xl p-2 pb-8 animate-[slideUp_0.2s_ease-out]" onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-[#333] rounded-full mx-auto mb-4 mt-1" />
+            <p className="text-center text-sm text-[#888] mb-3">{contextMenu.username}</p>
+            <button
+              onClick={() => {
+                const contact = contacts.find((c) => c.userId === contextMenu.userId);
+                if (contact) deleteChatHistory(contact);
+              }}
+              className="w-full flex items-center gap-3 px-5 py-3.5 text-[15px] text-white hover:bg-[#222] rounded-xl transition"
+            >
+              <svg className="w-5 h-5 text-[#888]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+              </svg>
+              トーク履歴を削除
+            </button>
+            <button
+              onClick={() => {
+                if (confirm(`${contextMenu.username} を連絡先から削除しますか？`)) {
+                  deleteContact(contextMenu.userId);
+                }
+              }}
+              className="w-full flex items-center gap-3 px-5 py-3.5 text-[15px] text-[#ef4444] hover:bg-[#222] rounded-xl transition"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+              </svg>
+              フレンドを削除
+            </button>
+            <button
+              onClick={() => setContextMenu(null)}
+              className="w-full flex items-center justify-center py-3.5 text-[15px] text-[#888] hover:bg-[#222] rounded-xl transition mt-1"
+            >
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

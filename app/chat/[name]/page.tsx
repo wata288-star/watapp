@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
+import { connectSocket, getSocket } from "@/lib/socket";
 
 interface ChatMessage {
   username: string;
@@ -10,7 +10,7 @@ interface ChatMessage {
   timestamp: number;
   socketId: string;
   type?: "text" | "image" | "video";
-  fileData?: string; // base64
+  fileData?: string;
   fileName?: string;
 }
 
@@ -32,9 +32,9 @@ export default function ChatPage() {
   const [isOnline, setIsOnline] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<{ type: "image" | "video"; src: string } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const socketIdRef = useRef("");
   const roomIdRef = useRef("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const myUsernameRef = useRef("");
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -78,37 +78,33 @@ export default function ChatPage() {
     }
     setMyUsername(savedName);
     setMyUserId(savedId);
+    myUsernameRef.current = savedName;
 
     const roomId = getChatRoomId(savedId, contactUserId);
     roomIdRef.current = roomId;
 
+    // 保存済みメッセージ復元
     const savedMsgs = loadMessages(roomId);
     setMessages(savedMsgs);
 
     const socket = connectSocket();
-    socketIdRef.current = socket.id || "";
 
+    // イベントハンドラを定義
     const onConnect = () => {
-      socketIdRef.current = socket.id || "";
-      socket.emit("register", { username: savedName, userId: savedId }, () => {});
-      socket.emit("join-room", { roomId, username: savedName });
+      socket.emit("register", { username: savedName, userId: savedId }, () => {
+        // register完了後にroom参加
+        socket.emit("join-room", { roomId, username: savedName });
+      });
     };
 
-    socket.on("connect", onConnect);
-
-    socket.on("room-users", (users: { socketId: string; username: string }[]) => {
+    const onRoomUsers = (users: { socketId: string; username: string }[]) => {
       setIsOnline(users.length > 0);
-    });
+    };
 
-    socket.on("user-joined", () => {
-      setIsOnline(true);
-    });
+    const onUserJoined = () => setIsOnline(true);
+    const onUserLeft = () => setIsOnline(false);
 
-    socket.on("user-left", () => {
-      setIsOnline(false);
-    });
-
-    socket.on("chat-message", (msg: ChatMessage) => {
+    const onChatMessage = (msg: ChatMessage) => {
       setMessages((prev) => {
         const updated = [...prev, msg];
         saveMessages(roomId, updated);
@@ -116,13 +112,33 @@ export default function ChatPage() {
       });
       const label = msg.type === "image" ? "写真" : msg.type === "video" ? "動画" : msg.message;
       updateContactLastMessage(label, msg.timestamp);
-    });
+    };
 
-    if (socket.connected) onConnect();
+    // 既存リスナーを全クリアしてから再登録（重複防止）
+    socket.off("connect", onConnect);
+    socket.off("room-users", onRoomUsers);
+    socket.off("user-joined", onUserJoined);
+    socket.off("user-left", onUserLeft);
+    socket.off("chat-message", onChatMessage);
+
+    socket.on("connect", onConnect);
+    socket.on("room-users", onRoomUsers);
+    socket.on("user-joined", onUserJoined);
+    socket.on("user-left", onUserLeft);
+    socket.on("chat-message", onChatMessage);
+
+    // 既に接続済みならすぐにルーム参加
+    if (socket.connected) {
+      onConnect();
+    }
 
     return () => {
+      // リスナーだけ外す（socketは切断しない = ホーム画面でも使い続ける）
       socket.off("connect", onConnect);
-      disconnectSocket();
+      socket.off("room-users", onRoomUsers);
+      socket.off("user-joined", onUserJoined);
+      socket.off("user-left", onUserLeft);
+      socket.off("chat-message", onChatMessage);
     };
   }, [contactUserId, router, loadMessages, saveMessages, updateContactLastMessage]);
 
@@ -141,7 +157,6 @@ export default function ChatPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 10MBまで
     if (file.size > 10 * 1024 * 1024) {
       alert("ファイルサイズは10MBまでです");
       return;
@@ -161,7 +176,6 @@ export default function ChatPage() {
     };
     reader.readAsDataURL(file);
 
-    // inputをリセット
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -229,7 +243,6 @@ export default function ChatPage() {
           const isOwn = msg.username === myUsername;
           return (
             <div key={i} className={`flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
-              {/* 画像メッセージ */}
               {msg.type === "image" && msg.fileData && (
                 <button
                   onClick={() => setPreviewMedia({ type: "image", src: msg.fileData! })}
@@ -243,11 +256,10 @@ export default function ChatPage() {
                 </button>
               )}
 
-              {/* 動画メッセージ */}
               {msg.type === "video" && msg.fileData && (
                 <button
                   onClick={() => setPreviewMedia({ type: "video", src: msg.fileData! })}
-                  className="max-w-[75%] rounded-2xl overflow-hidden mb-1"
+                  className="max-w-[75%] rounded-2xl overflow-hidden mb-1 relative"
                 >
                   <video
                     src={msg.fileData}
@@ -265,7 +277,6 @@ export default function ChatPage() {
                 </button>
               )}
 
-              {/* テキストメッセージ（画像/動画の場合は非表示） */}
               {(!msg.type || msg.type === "text") && (
                 <div
                   className={`max-w-[80%] px-3.5 py-2.5 text-[15px] leading-relaxed ${
@@ -286,7 +297,7 @@ export default function ChatPage() {
         <div ref={chatEndRef} />
       </div>
 
-      {/* メディアプレビュー（フルスクリーン） */}
+      {/* メディアプレビュー */}
       {previewMedia && (
         <div
           className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
@@ -322,7 +333,6 @@ export default function ChatPage() {
 
       {/* 入力欄 */}
       <form onSubmit={sendMessage} className="flex items-end gap-2 p-3 border-t border-[#1a1a1a]">
-        {/* 写真/動画アップロードボタン */}
         <input
           ref={fileInputRef}
           type="file"
