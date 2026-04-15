@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
 
 interface ChatMessage {
@@ -9,6 +9,9 @@ interface ChatMessage {
   message: string;
   timestamp: number;
   socketId: string;
+  type?: "text" | "image" | "video";
+  fileData?: string; // base64
+  fileName?: string;
 }
 
 function getChatRoomId(a: string, b: string): string {
@@ -17,21 +20,26 @@ function getChatRoomId(a: string, b: string): string {
 
 export default function ChatPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const contactName = decodeURIComponent(params.name as string);
+  const contactUserId = decodeURIComponent(params.name as string);
+  const contactName = searchParams.get("name") || contactUserId;
+
   const [myUsername, setMyUsername] = useState("");
+  const [myUserId, setMyUserId] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isOnline, setIsOnline] = useState(false);
+  const [previewMedia, setPreviewMedia] = useState<{ type: "image" | "video"; src: string } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const socketIdRef = useRef("");
   const roomIdRef = useRef("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // チャット履歴をlocalStorageから復元
   const loadMessages = useCallback((roomId: string) => {
     try {
       const saved = localStorage.getItem(`watapp-chat-${roomId}`);
@@ -41,62 +49,63 @@ export default function ChatPage() {
   }, []);
 
   const saveMessages = useCallback((roomId: string, msgs: ChatMessage[]) => {
-    // 最新100件のみ保存
     const toSave = msgs.slice(-100);
     localStorage.setItem(`watapp-chat-${roomId}`, JSON.stringify(toSave));
   }, []);
 
-  // 連絡先のlastMessageを更新
   const updateContactLastMessage = useCallback((msg: string, time: number) => {
     try {
       const saved = localStorage.getItem("watapp-contacts");
       if (!saved) return;
       const contacts = JSON.parse(saved);
-      const idx = contacts.findIndex((c: { username: string }) => c.username === contactName);
+      const idx = contacts.findIndex((c: { userId: string }) => c.userId === contactUserId);
       if (idx >= 0) {
         contacts[idx].lastMessage = msg;
         contacts[idx].lastTime = time;
-        // 最新のチャットを先頭に移動
         const [contact] = contacts.splice(idx, 1);
         contacts.unshift(contact);
         localStorage.setItem("watapp-contacts", JSON.stringify(contacts));
       }
     } catch {}
-  }, [contactName]);
+  }, [contactUserId]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("watapp-username");
-    if (!saved) {
+    const savedName = localStorage.getItem("watapp-username");
+    const savedId = localStorage.getItem("watapp-userId");
+    if (!savedName || !savedId) {
       router.push("/");
       return;
     }
-    setMyUsername(saved);
+    setMyUsername(savedName);
+    setMyUserId(savedId);
 
-    const roomId = getChatRoomId(saved, contactName);
+    const roomId = getChatRoomId(savedId, contactUserId);
     roomIdRef.current = roomId;
 
-    // 保存済みメッセージ復元
     const savedMsgs = loadMessages(roomId);
     setMessages(savedMsgs);
 
     const socket = connectSocket();
     socketIdRef.current = socket.id || "";
 
-    socket.on("connect", () => {
+    const onConnect = () => {
       socketIdRef.current = socket.id || "";
-      socket.emit("join-room", { roomId, username: saved });
-    });
+      socket.emit("register", { username: savedName, userId: savedId }, () => {});
+      socket.emit("join-room", { roomId, username: savedName });
+    };
+
+    socket.on("connect", onConnect);
 
     socket.on("room-users", (users: { socketId: string; username: string }[]) => {
-      setIsOnline(users.some((u) => u.username === contactName));
+      setIsOnline(users.length > 0);
     });
 
-    socket.on("user-joined", ({ username: joinedName }: { username: string }) => {
-      if (joinedName === contactName) setIsOnline(true);
+    socket.on("user-joined", () => {
+      setIsOnline(true);
     });
 
-    socket.on("user-left", ({ username: leftName }: { username: string }) => {
-      if (leftName === contactName) setIsOnline(false);
+    socket.on("user-left", () => {
+      setIsOnline(false);
     });
 
     socket.on("chat-message", (msg: ChatMessage) => {
@@ -105,18 +114,17 @@ export default function ChatPage() {
         saveMessages(roomId, updated);
         return updated;
       });
-      updateContactLastMessage(msg.message, msg.timestamp);
+      const label = msg.type === "image" ? "写真" : msg.type === "video" ? "動画" : msg.message;
+      updateContactLastMessage(label, msg.timestamp);
     });
 
-    if (socket.connected) {
-      socketIdRef.current = socket.id || "";
-      socket.emit("join-room", { roomId, username: saved });
-    }
+    if (socket.connected) onConnect();
 
     return () => {
+      socket.off("connect", onConnect);
       disconnectSocket();
     };
-  }, [contactName, router, loadMessages, saveMessages, updateContactLastMessage]);
+  }, [contactUserId, router, loadMessages, saveMessages, updateContactLastMessage]);
 
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,8 +132,37 @@ export default function ChatPage() {
     getSocket().emit("chat-message", {
       roomId: roomIdRef.current,
       message: newMessage.trim(),
+      type: "text",
     });
     setNewMessage("");
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 10MBまで
+    if (file.size > 10 * 1024 * 1024) {
+      alert("ファイルサイズは10MBまでです");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      const type = file.type.startsWith("video/") ? "video" : "image";
+      getSocket().emit("chat-message", {
+        roomId: roomIdRef.current,
+        message: type === "image" ? "写真を送信しました" : "動画を送信しました",
+        type,
+        fileData: base64,
+        fileName: file.name,
+      });
+    };
+    reader.readAsDataURL(file);
+
+    // inputをリセット
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const startCall = (withVideo: boolean) => {
@@ -160,7 +197,6 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* 通話ボタン */}
         <button
           onClick={() => startCall(false)}
           className="w-9 h-9 flex items-center justify-center text-[#888] hover:text-white transition"
@@ -193,15 +229,54 @@ export default function ChatPage() {
           const isOwn = msg.username === myUsername;
           return (
             <div key={i} className={`flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
-              <div
-                className={`max-w-[80%] px-3.5 py-2.5 text-[15px] leading-relaxed ${
-                  isOwn
-                    ? "bg-white text-black rounded-2xl rounded-br-sm"
-                    : "bg-[#1a1a1a] text-[#ccc] rounded-2xl rounded-bl-sm"
-                }`}
-              >
-                {msg.message}
-              </div>
+              {/* 画像メッセージ */}
+              {msg.type === "image" && msg.fileData && (
+                <button
+                  onClick={() => setPreviewMedia({ type: "image", src: msg.fileData! })}
+                  className="max-w-[75%] rounded-2xl overflow-hidden mb-1"
+                >
+                  <img
+                    src={msg.fileData}
+                    alt={msg.fileName || "画像"}
+                    className="max-w-full max-h-64 object-contain rounded-2xl"
+                  />
+                </button>
+              )}
+
+              {/* 動画メッセージ */}
+              {msg.type === "video" && msg.fileData && (
+                <button
+                  onClick={() => setPreviewMedia({ type: "video", src: msg.fileData! })}
+                  className="max-w-[75%] rounded-2xl overflow-hidden mb-1"
+                >
+                  <video
+                    src={msg.fileData}
+                    className="max-w-full max-h-64 rounded-2xl"
+                    playsInline
+                    muted
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-12 h-12 bg-black/50 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                </button>
+              )}
+
+              {/* テキストメッセージ（画像/動画の場合は非表示） */}
+              {(!msg.type || msg.type === "text") && (
+                <div
+                  className={`max-w-[80%] px-3.5 py-2.5 text-[15px] leading-relaxed ${
+                    isOwn
+                      ? "bg-white text-black rounded-2xl rounded-br-sm"
+                      : "bg-[#1a1a1a] text-[#ccc] rounded-2xl rounded-bl-sm"
+                  }`}
+                >
+                  {msg.message}
+                </div>
+              )}
               <span className="text-[10px] text-[#333] mt-1">
                 {new Date(msg.timestamp).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
               </span>
@@ -211,8 +286,60 @@ export default function ChatPage() {
         <div ref={chatEndRef} />
       </div>
 
+      {/* メディアプレビュー（フルスクリーン） */}
+      {previewMedia && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          onClick={() => setPreviewMedia(null)}
+        >
+          <button
+            onClick={() => setPreviewMedia(null)}
+            className="absolute top-4 right-4 w-10 h-10 bg-[#1a1a1a] rounded-full flex items-center justify-center text-white z-10"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          {previewMedia.type === "image" ? (
+            <img
+              src={previewMedia.src}
+              alt="プレビュー"
+              className="max-w-[95vw] max-h-[90vh] object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <video
+              src={previewMedia.src}
+              controls
+              autoPlay
+              playsInline
+              className="max-w-[95vw] max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+        </div>
+      )}
+
       {/* 入力欄 */}
-      <form onSubmit={sendMessage} className="flex gap-2 p-3 border-t border-[#1a1a1a]">
+      <form onSubmit={sendMessage} className="flex items-end gap-2 p-3 border-t border-[#1a1a1a]">
+        {/* 写真/動画アップロードボタン */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="w-11 h-11 bg-[#141414] border border-[#222] rounded-xl flex items-center justify-center text-[#888] hover:text-white transition shrink-0"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+          </svg>
+        </button>
+
         <input
           type="text"
           value={newMessage}
