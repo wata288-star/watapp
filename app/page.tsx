@@ -191,7 +191,7 @@ export default function Home() {
       <main className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <div className="text-center mb-10">
-            <h1 className="text-[32px] font-extrabold tracking-tight text-white">WatApp</h1>
+            <h1 className="text-[32px] font-extrabold tracking-tight text-white">Watapp</h1>
             <p className="text-[#666] text-sm mt-1">通話・チャット</p>
           </div>
           <form onSubmit={register}>

@@ -1,11 +1,11 @@
 {
-  "name": "CallApp - ビデオ通話アプリ",
-  "short_name": "CallApp",
-  "description": "ブラウザで使えるビデオ通話・チャットアプリ",
+  "name": "Watapp - 通話・チャット",
+  "short_name": "Watapp",
+  "description": "ブラウザで使える通話・チャットアプリ",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
   "orientation": "portrait",
   "icons": [
     {
