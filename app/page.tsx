@@ -39,7 +39,17 @@ export default function Home() {
     }
   }, []);
 
-  // セットアップ済みならSocket接続してregister
+  // 連絡先を追加するヘルパー（重複チェック付き）
+  const addContactToList = useCallback((newContact: Contact) => {
+    setContacts((prev) => {
+      if (prev.some((c) => c.userId === newContact.userId)) return prev;
+      const updated = [newContact, ...prev];
+      localStorage.setItem("watapp-contacts", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // セットアップ済みならSocket接続してregister + 通知リッスン
   useEffect(() => {
     if (!isSetup || !myUserId) return;
     const socket = connectSocket();
@@ -48,10 +58,18 @@ export default function Home() {
     };
     socket.on("connect", doRegister);
     if (socket.connected) doRegister();
+
+    // 相手が自分を追加したときの通知 → 自動で連絡先に追加
+    const onContactAdded = ({ userId, username }: { userId: string; username: string }) => {
+      addContactToList({ userId, username, lastMessage: `${username} があなたを追加しました`, lastTime: Date.now() });
+    };
+    socket.on("contact-added", onContactAdded);
+
     return () => {
       socket.off("connect", doRegister);
+      socket.off("contact-added", onContactAdded);
     };
-  }, [isSetup, myUserId, myUsername]);
+  }, [isSetup, myUserId, myUsername, addContactToList]);
 
   // 新規登録
   const register = useCallback((e: React.FormEvent) => {
@@ -100,7 +118,7 @@ export default function Home() {
     });
   }, [searchId, myUserId]);
 
-  // 連絡先に追加
+  // 連絡先に追加 → サーバー経由で相手にも通知
   const addContact = useCallback(() => {
     if (!searchResult?.found || !searchResult.userId || !searchResult.username) return;
     if (contacts.some((c) => c.userId === searchResult.userId)) {
@@ -111,13 +129,18 @@ export default function Home() {
       userId: searchResult.userId,
       username: searchResult.username,
     };
-    const updated = [newContact, ...contacts];
-    setContacts(updated);
-    localStorage.setItem("watapp-contacts", JSON.stringify(updated));
+
+    // 自分の連絡先に追加
+    addContactToList(newContact);
+
+    // サーバー経由で相手に通知（相手側にも自動で連絡先追加される）
+    const socket = getSocket();
+    socket.emit("add-contact", { targetUserId: searchResult.userId }, () => {});
+
     setSearchId("");
     setSearchResult(null);
     setShowAdd(false);
-  }, [searchResult, contacts]);
+  }, [searchResult, contacts, addContactToList]);
 
   const openChat = (contact: Contact) => {
     router.push(`/chat/${encodeURIComponent(contact.userId)}?name=${encodeURIComponent(contact.username)}`);

@@ -85,6 +85,29 @@ app.prepare().then(() => {
       }
     });
 
+    // 連絡先追加 → 相手にも通知して自動的に連絡先を追加
+    socket.on("add-contact", ({ targetUserId }, callback) => {
+      const targetUser = users.get(targetUserId);
+      const myUserId = socket.data.userId;
+      const myUsername = socket.data.username;
+
+      if (!targetUser || !myUserId) {
+        callback({ success: false });
+        return;
+      }
+
+      // 相手がオンラインなら通知を送る
+      if (targetUser.socketId) {
+        io.to(targetUser.socketId).emit("contact-added", {
+          userId: myUserId,
+          username: myUsername,
+        });
+      }
+
+      callback({ success: true });
+      console.log(`${myUsername} (${myUserId}) → ${targetUser.username} (${targetUserId}) を連絡先に追加`);
+    });
+
     // ルームに参加
     socket.on("join-room", ({ roomId, username }) => {
       // 前のルームから退出
