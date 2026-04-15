@@ -35,10 +35,14 @@ export default function Home() {
     if (savedAdmin === "true") setIsAdmin(true);
     const savedName = localStorage.getItem("watapp-username");
     const savedId = localStorage.getItem("watapp-userId");
-    if (savedName && savedId) {
+    const loggedOut = localStorage.getItem("watapp-loggedOut");
+    if (savedName && savedId && loggedOut !== "true") {
       setMyUsername(savedName);
       setMyUserId(savedId);
       setIsSetup(true);
+    } else if (savedName) {
+      // ログアウト後：名前は復元（入力欄にプリセット）
+      setMyUsername(savedName);
     }
     const savedContacts = localStorage.getItem("watapp-contacts");
     if (savedContacts) {
@@ -78,22 +82,26 @@ export default function Home() {
     };
   }, [isSetup, myUserId, myUsername, addContactToList]);
 
-  // 新規登録
+  // 新規登録 or 再ログイン
   const register = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!myUsername.trim()) return;
     setIsRegistering(true);
 
+    // 保存済みIDがあれば再利用（アカウント保持）
+    const existingId = localStorage.getItem("watapp-userId");
+
     const socket = connectSocket();
     const doRegister = () => {
-      socket.off("connect", doRegister); // 登録後はリスナー解除
+      socket.off("connect", doRegister);
       socket.emit(
         "register",
-        { username: myUsername.trim(), userId: null },
+        { username: myUsername.trim(), userId: existingId || null },
         (res: { userId: string; username: string }) => {
           setMyUserId(res.userId);
           localStorage.setItem("watapp-username", res.username);
           localStorage.setItem("watapp-userId", res.userId);
+          localStorage.removeItem("watapp-loggedOut");
           setIsSetup(true);
           setIsRegistering(false);
         }
@@ -262,14 +270,10 @@ export default function Home() {
             onClick={() => {
               if (confirm("ログアウトしますか？")) {
                 disconnectSocket();
-                localStorage.removeItem("watapp-username");
-                localStorage.removeItem("watapp-userId");
-                localStorage.removeItem("watapp-contacts");
+                // アカウント情報（userId, contacts）は保持。ログイン状態だけ解除
                 localStorage.removeItem("watapp-admin");
+                localStorage.setItem("watapp-loggedOut", "true");
                 setIsSetup(false);
-                setMyUsername("");
-                setMyUserId("");
-                setContacts([]);
                 setIsAdmin(false);
                 setShowMyId(false);
                 setShowAdminInput(false);
