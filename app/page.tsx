@@ -32,6 +32,9 @@ export default function Home() {
   const [newIdInput, setNewIdInput] = useState("");
   const [idError, setIdError] = useState("");
 
+  // 管理者IDリスト（これらのIDは自動的に管理者権限を持つ）
+  const ADMIN_IDS = ["WATARU"];
+
   // 保存済みデータを復元
   useEffect(() => {
     const savedAdmin = localStorage.getItem("watapp-admin");
@@ -43,8 +46,12 @@ export default function Home() {
       setMyUsername(savedName);
       setMyUserId(savedId);
       setIsSetup(true);
+      // 管理者IDなら自動で管理者モードON
+      if (ADMIN_IDS.includes(savedId)) {
+        setIsAdmin(true);
+        localStorage.setItem("watapp-admin", "true");
+      }
     } else if (savedName) {
-      // ログアウト後：名前は復元（入力欄にプリセット）
       setMyUsername(savedName);
     }
     const savedContacts = localStorage.getItem("watapp-contacts");
@@ -105,6 +112,11 @@ export default function Home() {
           localStorage.setItem("watapp-username", res.username);
           localStorage.setItem("watapp-userId", res.userId);
           localStorage.removeItem("watapp-loggedOut");
+          // 管理者IDなら自動で管理者モードON
+          if (ADMIN_IDS.includes(res.userId)) {
+            setIsAdmin(true);
+            localStorage.setItem("watapp-admin", "true");
+          }
           setIsSetup(true);
           setIsRegistering(false);
         }
@@ -173,6 +185,11 @@ export default function Home() {
       if (res.success && res.newId) {
         setMyUserId(res.newId);
         localStorage.setItem("watapp-userId", res.newId);
+        // 管理者IDに変更した場合は自動で管理者モードON
+        if (ADMIN_IDS.includes(res.newId)) {
+          setIsAdmin(true);
+          localStorage.setItem("watapp-admin", "true");
+        }
         setEditingId(false);
         setNewIdInput("");
         setIdError("");
