@@ -86,6 +86,7 @@ export default function Home() {
 
     const socket = connectSocket();
     const doRegister = () => {
+      socket.off("connect", doRegister); // 登録後はリスナー解除
       socket.emit(
         "register",
         { username: myUsername.trim(), userId: null },
@@ -260,14 +261,19 @@ export default function Home() {
           <button
             onClick={() => {
               if (confirm("ログアウトしますか？")) {
+                disconnectSocket();
                 localStorage.removeItem("watapp-username");
                 localStorage.removeItem("watapp-userId");
                 localStorage.removeItem("watapp-contacts");
-                disconnectSocket();
+                localStorage.removeItem("watapp-admin");
                 setIsSetup(false);
                 setMyUsername("");
                 setMyUserId("");
                 setContacts([]);
+                setIsAdmin(false);
+                setShowMyId(false);
+                setShowAdminInput(false);
+                setIdTapCount(0);
               }
             }}
             className="w-9 h-9 bg-[#1a1a1a] rounded-full flex items-center justify-center text-[#666] hover:bg-[#222] transition"

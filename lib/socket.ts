@@ -23,7 +23,9 @@ export const connectSocket = (): Socket => {
 };
 
 export const disconnectSocket = () => {
-  if (socket?.connected) {
+  if (socket) {
+    socket.removeAllListeners();
     socket.disconnect();
+    socket = null;
   }
 };
