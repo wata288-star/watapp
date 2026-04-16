@@ -66,20 +66,24 @@ export default function ChatPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // visualViewport でキーボード開閉時にコンテナ高さをリアルタイム追従
-  // → 入力欄がキーボード直上に密着する（LINE風）
+  // visualViewport でキーボード開閉時にコンテナをリアルタイム追従
+  // iOS Safari はキーボード表示時にページ自体をスクロールし、
+  // fixed要素がずれるため offsetTop も合わせて補正する
   useEffect(() => {
     if (typeof window === "undefined") return;
     const vv = window.visualViewport;
     if (!vv) return;
 
     const update = () => {
-      // viewportのoffsetTop（アドレスバー分）を考慮して正確な高さを設定
+      const el = containerRef.current;
+      if (!el) return;
+      // コンテナの高さ＝実際に見えている領域の高さ
+      el.style.height = `${vv.height}px`;
+      // コンテナの位置＝iOS がページをスクロールした分だけ下にずらす
+      // これでキーボードの真上にコンテナ下端（入力欄）がぴったり来る
+      el.style.top = `${vv.offsetTop}px`;
       setViewportH(vv.height);
-      // スクロール位置も補正（iOS Safari はキーボード出現時にページ自体をスクロールする）
-      if (containerRef.current) {
-        containerRef.current.style.height = `${vv.height}px`;
-      }
+
       // 最新メッセージを表示
       requestAnimationFrame(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
