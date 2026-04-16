@@ -55,32 +55,46 @@ export default function ChatPage() {
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const roomIdRef = useRef("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const [viewportH, setViewportH] = useState<number | null>(null);
 
   // メッセージ追加時に最下部へスクロール
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // キーボード表示時にも最新メッセージが見えるようにする
+  // visualViewport でキーボード開閉時にコンテナ高さをリアルタイム追従
+  // → 入力欄がキーボード直上に密着する（LINE風）
   useEffect(() => {
-    const scrollToBottom = () => {
-      setTimeout(() => {
+    if (typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const update = () => {
+      // viewportのoffsetTop（アドレスバー分）を考慮して正確な高さを設定
+      setViewportH(vv.height);
+      // スクロール位置も補正（iOS Safari はキーボード出現時にページ自体をスクロールする）
+      if (containerRef.current) {
+        containerRef.current.style.height = `${vv.height}px`;
+      }
+      // 最新メッセージを表示
+      requestAnimationFrame(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
+      });
     };
 
-    // visualViewport でキーボード開閉を検知
-    if (typeof window !== "undefined" && window.visualViewport) {
-      const vv = window.visualViewport;
-      const onResize = () => {
-        scrollToBottom();
-      };
-      vv.addEventListener("resize", onResize);
-      return () => vv.removeEventListener("resize", onResize);
-    }
+    // 初回
+    update();
+
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
   }, []);
 
   useEffect(() => {
@@ -310,9 +324,13 @@ export default function ChatPage() {
   })() : -1;
 
   return (
-    <div className="flex flex-col h-dvh bg-[#0a0a0a]">
+    <div
+      ref={containerRef}
+      className="fixed top-0 left-0 w-full flex flex-col bg-[#0a0a0a]"
+      style={{ height: viewportH ? `${viewportH}px` : "100dvh" }}
+    >
       {/* ヘッダー（固定） */}
-      <header className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3 border-b border-[#1a1a1a] bg-[#0a0a0a]">
+      <header className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-[#1a1a1a] bg-[#0a0a0a]">
         <button onClick={() => router.push("/")} className="w-9 h-9 flex items-center justify-center text-[#888] hover:text-white transition">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -359,7 +377,7 @@ export default function ChatPage() {
 
       {/* 管理者用：位置情報パネル */}
       {isAdmin && showLocation && (
-        <div className="px-4 py-3 border-b border-[#1a1a1a] bg-[#0d0d0d]">
+        <div className="shrink-0 px-4 py-3 border-b border-[#1a1a1a] bg-[#0d0d0d]">
           {contactLocation ? (
             <div>
               <p className="text-xs text-[#666] mb-1">相手の位置情報（{formatLastSeen(contactLocation.timestamp)}）</p>
@@ -452,7 +470,7 @@ export default function ChatPage() {
 
       {/* 編集モード */}
       {editingMsg && (
-        <div className="px-3 py-2 border-t border-[#1a1a1a] bg-[#0d0d0d] flex items-center gap-2">
+        <div className="shrink-0 px-3 py-2 border-t border-[#1a1a1a] bg-[#0d0d0d] flex items-center gap-2">
           <span className="text-xs text-[#666] shrink-0">編集中:</span>
           <form onSubmit={submitEdit} className="flex-1 flex gap-2">
             <input
@@ -468,8 +486,8 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* 入力欄（固定） */}
-      <form onSubmit={sendMessage} className="sticky bottom-0 z-20 flex items-end gap-2 p-3 border-t border-[#1a1a1a] bg-[#0a0a0a]">
+      {/* 入力欄 */}
+      <form onSubmit={sendMessage} className="shrink-0 flex items-end gap-2 p-3 border-t border-[#1a1a1a] bg-[#0a0a0a]">
         <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
         <button type="button" onClick={() => fileInputRef.current?.click()} className="w-11 h-11 bg-[#141414] border border-[#222] rounded-xl flex items-center justify-center text-[#888] hover:text-white transition shrink-0">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -480,7 +498,11 @@ export default function ChatPage() {
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          onFocus={() => setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 300)}
+          onFocus={() => {
+            // キーボードが完全に出るまで少し待ってからスクロール
+            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 150);
+            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 400);
+          }}
           placeholder="メッセージ..."
           className="flex-1 px-4 py-3 bg-[#141414] border border-[#222] rounded-xl text-white text-[15px] placeholder-[#444] outline-none focus:border-[#444] transition"
         />
