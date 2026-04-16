@@ -302,7 +302,7 @@ export default function Home() {
               <p className="text-xs text-[#bbb] mb-3">読みごたえのある記事を毎日ピックアップ</p>
 
               {/* メイン記事（大きいカード） */}
-              <div className="rounded-2xl overflow-hidden mb-4 shadow-sm border border-[#f0f0f0]">
+              <div className="rounded-2xl overflow-hidden mb-4 shadow-sm border border-[#f0f0f0] cursor-pointer active:opacity-70 transition-opacity" onClick={() => router.push(`/article/${ARTICLES[0].id}`)}>
                 <img src={ARTICLES[0].img} alt="" className="w-full h-48 object-cover" />
                 <div className="p-3.5">
                   <p className="text-[15px] font-bold text-[#333] leading-snug">{ARTICLES[0].title}</p>
@@ -317,7 +317,7 @@ export default function Home() {
 
               {/* 記事リスト */}
               {ARTICLES.slice(1).map((article) => (
-                <div key={article.id} className="flex gap-3 py-3.5 border-t border-[#f0f0f0]">
+                <div key={article.id} className="flex gap-3 py-3.5 border-t border-[#f0f0f0] cursor-pointer active:opacity-70 transition-opacity" onClick={() => router.push(`/article/${article.id}`)}>
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-medium text-[#333] leading-snug line-clamp-2">{article.title}</p>
                     <div className="flex items-center gap-1.5 mt-2">
@@ -375,7 +375,7 @@ export default function Home() {
             </div>
             <p className="text-xs text-[#999] mt-6 mb-3 font-medium">人気の記事</p>
             {ARTICLES.slice(0, 5).map((article) => (
-              <div key={article.id} className="flex gap-3 py-3 border-t border-[#f0f0f0]">
+              <div key={article.id} className="flex gap-3 py-3 border-t border-[#f0f0f0] cursor-pointer active:opacity-70 transition-opacity" onClick={() => router.push(`/article/${article.id}`)}>
                 <img src={article.img} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-[#333] leading-snug line-clamp-2">{article.title}</p>
