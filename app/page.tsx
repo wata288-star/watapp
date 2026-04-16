@@ -13,18 +13,18 @@ interface Contact {
 
 // ダミー記事データ（コラムアプリの偽装用）
 const ARTICLES = [
-  { id: 1, title: "朝5分の習慣が人生を変える｜今日から始める朝活のすすめ", author: "暮らしの知恵袋", likes: 342, date: "3時間前", color: "#e8d5b7", cat: "ライフスタイル" },
-  { id: 2, title: "無印良品で買ってよかったキッチングッズ10選", author: "シンプルライフ研究所", likes: 891, date: "5時間前", color: "#c4d9a0", cat: "暮らし" },
-  { id: 3, title: "読書嫌いだった私が年間100冊読めるようになった方法", author: "本のソムリエ", likes: 567, date: "8時間前", color: "#a8c8e8", cat: "自己啓発" },
-  { id: 4, title: "一人暮らしの自炊｜週末2時間で平日5日分の作り置き", author: "ゆる自炊部", likes: 1203, date: "12時間前", color: "#d4b8d4", cat: "料理" },
-  { id: 5, title: "在宅ワーク3年目でわかった、集中できる部屋づくり", author: "リモートワーカーの手帖", likes: 445, date: "1日前", color: "#f0c8a8", cat: "仕事" },
-  { id: 6, title: "スマホ断ちを1週間やってみた結果", author: "デジタルウェルネス", likes: 723, date: "1日前", color: "#b8d8d0", cat: "ライフスタイル" },
-  { id: 7, title: "30代から始める資産形成｜まずやるべき3つのこと", author: "お金の教室", likes: 1567, date: "2日前", color: "#e8c8c8", cat: "マネー" },
-  { id: 8, title: "心が疲れた時に読みたい、気持ちが楽になる考え方", author: "こころの処方箋", likes: 2341, date: "2日前", color: "#c8d0e8", cat: "メンタルヘルス" },
-  { id: 9, title: "IKEAの収納ハック｜6畳部屋を広く見せるテクニック", author: "収納マスター", likes: 678, date: "3日前", color: "#d8e0b8", cat: "インテリア" },
-  { id: 10, title: "コンビニで見つけた、仕事帰りのご褒美スイーツ5選", author: "スイーツ探検隊", likes: 432, date: "3日前", color: "#f0d8c0", cat: "グルメ" },
-  { id: 11, title: "睡眠の質が劇的に変わる｜寝る前の5つの習慣", author: "ぐっすり研究室", likes: 1890, date: "4日前", color: "#c0c8e0", cat: "健康" },
-  { id: 12, title: "カフェ巡り好きが教える、東京の隠れ家カフェ8選", author: "カフェ散歩", likes: 534, date: "4日前", color: "#e0d0c0", cat: "お出かけ" },
+  { id: 1, title: "朝5分の習慣が人生を変える｜今日から始める朝活のすすめ", author: "暮らしの知恵袋", likes: 342, date: "3時間前", img: "/art-1.jpg", cat: "ライフスタイル", avatar: "#f5a623" },
+  { id: 2, title: "無印良品で買ってよかったキッチングッズ10選", author: "シンプルライフ研究所", likes: 891, date: "5時間前", img: "/art-2.jpg", cat: "暮らし", avatar: "#7ed321" },
+  { id: 3, title: "読書嫌いだった私が年間100冊読めるようになった方法", author: "本のソムリエ", likes: 567, date: "8時間前", img: "/art-3.jpg", cat: "自己啓発", avatar: "#4a90d9" },
+  { id: 4, title: "一人暮らしの自炊｜週末2時間で平日5日分の作り置き", author: "ゆる自炊部", likes: 1203, date: "12時間前", img: "/art-4.jpg", cat: "料理", avatar: "#bd10e0" },
+  { id: 5, title: "在宅ワーク3年目でわかった、集中できる部屋づくり", author: "リモートワーカーの手帖", likes: 445, date: "1日前", img: "/art-5.jpg", cat: "仕事", avatar: "#f08c56" },
+  { id: 6, title: "スマホ断ちを1週間やってみた結果", author: "デジタルウェルネス", likes: 723, date: "1日前", img: "/art-6.jpg", cat: "ライフスタイル", avatar: "#50c8b4" },
+  { id: 7, title: "30代から始める資産形成｜まずやるべき3つのこと", author: "お金の教室", likes: 1567, date: "2日前", img: "/art-7.jpg", cat: "マネー", avatar: "#d0021b" },
+  { id: 8, title: "心が疲れた時に読みたい、気持ちが楽になる考え方", author: "こころの処方箋", likes: 2341, date: "2日前", img: "/art-8.jpg", cat: "メンタルヘルス", avatar: "#9013fe" },
+  { id: 9, title: "IKEAの収納ハック｜6畳部屋を広く見せるテクニック", author: "収納マスター", likes: 678, date: "3日前", img: "/art-9.jpg", cat: "インテリア", avatar: "#b8e986" },
+  { id: 10, title: "コンビニで見つけた、仕事帰りのご褒美スイーツ5選", author: "スイーツ探検隊", likes: 432, date: "3日前", img: "/art-10.jpg", cat: "グルメ", avatar: "#f5a623" },
+  { id: 11, title: "睡眠の質が劇的に変わる｜寝る前の5つの習慣", author: "ぐっすり研究室", likes: 1890, date: "4日前", img: "/art-11.jpg", cat: "健康", avatar: "#4a90d9" },
+  { id: 12, title: "カフェ巡り好きが教える、東京の隠れ家カフェ8選", author: "カフェ散歩", likes: 534, date: "4日前", img: "/art-12.jpg", cat: "お出かけ", avatar: "#50c8b4" },
 ];
 
 const TRENDING_TAGS = ["朝活", "ミニマリスト", "作り置き", "在宅ワーク", "読書", "節約術"];
@@ -302,38 +302,35 @@ export default function Home() {
               <p className="text-xs text-[#bbb] mb-3">読みごたえのある記事を毎日ピックアップ</p>
 
               {/* メイン記事（大きいカード） */}
-              <div className="rounded-xl overflow-hidden mb-4 border border-[#f0f0f0]">
-                <div className="h-48 flex items-center justify-center" style={{ backgroundColor: ARTICLES[0].color }}>
-                  <svg className="w-16 h-16 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>
-                </div>
-                <div className="p-3">
-                  <p className="text-[15px] font-semibold text-[#333] leading-snug">{ARTICLES[0].title}</p>
-                  <div className="flex items-center gap-2 mt-2 text-xs text-[#aaa]">
-                    <span>♡ {ARTICLES[0].likes}</span>
-                    <span>·</span>
-                    <span>{ARTICLES[0].author}</span>
-                    <span>·</span>
-                    <span>{ARTICLES[0].date}</span>
+              <div className="rounded-2xl overflow-hidden mb-4 shadow-sm border border-[#f0f0f0]">
+                <img src={ARTICLES[0].img} alt="" className="w-full h-48 object-cover" />
+                <div className="p-3.5">
+                  <p className="text-[15px] font-bold text-[#333] leading-snug">{ARTICLES[0].title}</p>
+                  <div className="flex items-center gap-2 mt-2.5">
+                    <div className="w-5 h-5 rounded-full shrink-0" style={{ backgroundColor: ARTICLES[0].avatar }} />
+                    <span className="text-[11px] text-[#999]">{ARTICLES[0].author}</span>
+                    <span className="text-[11px] text-[#ccc]">{ARTICLES[0].date}</span>
+                    <span className="text-[11px] text-[#ccc] ml-auto">♡ {ARTICLES[0].likes}</span>
                   </div>
                 </div>
               </div>
 
               {/* 記事リスト */}
               {ARTICLES.slice(1).map((article) => (
-                <div key={article.id} className="flex gap-3 py-3 border-t border-[#f5f5f5]">
+                <div key={article.id} className="flex gap-3 py-3.5 border-t border-[#f0f0f0]">
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-medium text-[#333] leading-snug line-clamp-2">{article.title}</p>
-                    <div className="flex items-center gap-2 mt-1.5 text-[11px] text-[#bbb]">
-                      <span>♡ {article.likes}</span>
-                      <span>·</span>
-                      <span>{article.author}</span>
-                      <span>·</span>
-                      <span>{article.date}</span>
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: article.avatar }} />
+                      <span className="text-[11px] text-[#999]">{article.author}</span>
+                      <span className="text-[11px] text-[#ccc]">{article.date}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-[11px] text-[#ccc]">♡ {article.likes}</span>
+                      <span className="text-[10px] text-[#ccc] bg-[#f8f8f8] px-1.5 py-0.5 rounded">{article.cat}</span>
                     </div>
                   </div>
-                  <div className="w-16 h-16 rounded-lg shrink-0 flex items-center justify-center" style={{ backgroundColor: article.color }}>
-                    <span className="text-xs text-white/70 font-medium">{article.cat}</span>
-                  </div>
+                  <img src={article.img} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
                 </div>
               ))}
 
@@ -350,16 +347,45 @@ export default function Home() {
         <>
           <header className="px-4 pt-4 pb-3 border-b border-[#f0f0f0]">
             <h1 className="text-xl font-bold text-[#333]">みつける</h1>
+            <div className="flex items-center gap-2 mt-3 px-3 py-2.5 bg-[#f5f5f5] rounded-full">
+              <svg className="w-4 h-4 text-[#bbb]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+              <span className="text-sm text-[#bbb]">キーワードで検索</span>
+            </div>
           </header>
           <div className="flex-1 overflow-y-auto p-4">
-            <p className="text-xs text-[#bbb] mb-3">カテゴリから探す</p>
+            <p className="text-xs text-[#999] mb-3 font-medium">カテゴリから探す</p>
             <div className="grid grid-cols-2 gap-3">
-              {["ライフスタイル", "料理", "仕事", "健康", "マネー", "インテリア", "自己啓発", "グルメ"].map((cat, i) => (
-                <div key={cat} className="p-4 rounded-xl border border-[#f0f0f0] text-center" style={{ backgroundColor: ARTICLES[i]?.color || "#f0f0f0" }}>
-                  <span className="text-sm font-medium text-white/90">{cat}</span>
+              {[
+                { cat: "ライフスタイル", img: "/art-1.jpg" },
+                { cat: "料理", img: "/art-4.jpg" },
+                { cat: "仕事", img: "/art-5.jpg" },
+                { cat: "健康", img: "/art-11.jpg" },
+                { cat: "マネー", img: "/art-7.jpg" },
+                { cat: "インテリア", img: "/art-9.jpg" },
+                { cat: "自己啓発", img: "/art-3.jpg" },
+                { cat: "グルメ", img: "/art-10.jpg" },
+              ].map((item) => (
+                <div key={item.cat} className="relative rounded-xl overflow-hidden h-24">
+                  <img src={item.img} alt="" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                    <span className="text-sm font-bold text-white">{item.cat}</span>
+                  </div>
                 </div>
               ))}
             </div>
+            <p className="text-xs text-[#999] mt-6 mb-3 font-medium">人気の記事</p>
+            {ARTICLES.slice(0, 5).map((article) => (
+              <div key={article.id} className="flex gap-3 py-3 border-t border-[#f0f0f0]">
+                <img src={article.img} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-[#333] leading-snug line-clamp-2">{article.title}</p>
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: article.avatar }} />
+                    <span className="text-[10px] text-[#999]">{article.author}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}
