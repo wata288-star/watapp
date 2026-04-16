@@ -335,27 +335,27 @@ export default function ChatPage() {
   return (
     <div
       ref={containerRef}
-      className="fixed top-0 left-0 w-full flex flex-col bg-[#0a0a0a]"
+      className="fixed top-0 left-0 w-full flex flex-col bg-white"
       style={{ height: viewportH ? `${viewportH}px` : "100dvh" }}
     >
       {/* ヘッダー（固定） */}
-      <header className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-[#1a1a1a] bg-[#0a0a0a]">
-        <button onClick={() => router.push("/")} className="w-9 h-9 flex items-center justify-center text-[#888] hover:text-white transition">
+      <header className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-[#e5e5e5] bg-white">
+        <button onClick={() => router.push("/")} className="w-9 h-9 flex items-center justify-center text-[#555] hover:text-black transition">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
         </button>
 
-        <div className="w-10 h-10 bg-[#1a1a1a] rounded-full flex items-center justify-center shrink-0">
-          <span className="text-base font-bold text-[#555]">{contactName.charAt(0).toUpperCase()}</span>
+        <div className="w-10 h-10 bg-[#e8e8e8] rounded-full flex items-center justify-center shrink-0">
+          <span className="text-base font-bold text-[#888]">{contactName.charAt(0).toUpperCase()}</span>
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="text-[15px] font-semibold text-white truncate">{contactName}</div>
+          <div className="text-[15px] font-semibold text-[#111] truncate">{contactName}</div>
           {isAdmin && (
             <div className="flex items-center gap-1.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-[#34d399]" : "bg-[#555]"}`} />
-              <span className="text-[11px] text-[#555]">
+              <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-[#34d399]" : "bg-[#ccc]"}`} />
+              <span className="text-[11px] text-[#999]">
                 {isOnline ? "オンライン" : lastSeen ? `最終: ${formatLastSeen(lastSeen)}` : "オフライン"}
               </span>
             </div>
@@ -364,7 +364,7 @@ export default function ChatPage() {
 
         {/* 管理者用：位置情報ボタン */}
         {isAdmin && (
-          <button onClick={requestLocation} className={`w-9 h-9 flex items-center justify-center transition ${showLocation ? "text-[#34d399]" : "text-[#888] hover:text-white"}`} title="位置情報">
+          <button onClick={requestLocation} className={`w-9 h-9 flex items-center justify-center transition ${showLocation ? "text-[#34d399]" : "text-[#888] hover:text-black"}`} title="位置情報">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
@@ -372,12 +372,12 @@ export default function ChatPage() {
           </button>
         )}
 
-        <button onClick={() => startCall(false)} className="w-9 h-9 flex items-center justify-center text-[#888] hover:text-white transition" title="音声通話">
+        <button onClick={() => startCall(false)} className="w-9 h-9 flex items-center justify-center text-[#888] hover:text-black transition" title="音声通話">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
           </svg>
         </button>
-        <button onClick={() => startCall(true)} className="w-9 h-9 flex items-center justify-center text-[#888] hover:text-white transition" title="ビデオ通話">
+        <button onClick={() => startCall(true)} className="w-9 h-9 flex items-center justify-center text-[#888] hover:text-black transition" title="ビデオ通話">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
@@ -386,7 +386,7 @@ export default function ChatPage() {
 
       {/* 管理者用：位置情報パネル */}
       {isAdmin && showLocation && (
-        <div className="shrink-0 px-4 py-3 border-b border-[#1a1a1a] bg-[#0d0d0d]">
+        <div className="shrink-0 px-4 py-3 border-b border-[#e5e5e5] bg-[#f8f8f8]">
           {contactLocation ? (
             <div>
               <p className="text-xs text-[#666] mb-1">相手の位置情報（{formatLastSeen(contactLocation.timestamp)}）</p>
@@ -406,11 +406,11 @@ export default function ChatPage() {
       )}
 
       {/* メッセージ一覧 */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#f2f2f2]">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full">
-            <p className="text-[#333] text-sm">メッセージはまだありません</p>
-            <p className="text-[#222] text-xs mt-1">最初のメッセージを送ろう</p>
+            <p className="text-[#999] text-sm">メッセージはまだありません</p>
+            <p className="text-[#bbb] text-xs mt-1">最初のメッセージを送ろう</p>
           </div>
         )}
         {messages.map((msg, i) => {
@@ -439,8 +439,8 @@ export default function ChatPage() {
                   onClick={() => isOwn && startEdit(msg)}
                   className={`max-w-[80%] px-3.5 py-2.5 text-[15px] leading-relaxed ${
                     isOwn
-                      ? "bg-white text-black rounded-2xl rounded-br-sm cursor-pointer active:opacity-80"
-                      : "bg-[#1a1a1a] text-[#ccc] rounded-2xl rounded-bl-sm"
+                      ? "bg-[#82D955] text-black rounded-2xl rounded-br-sm cursor-pointer active:opacity-80"
+                      : "bg-white text-[#111] rounded-2xl rounded-bl-sm"
                   }`}
                 >
                   {msg.message}
@@ -449,7 +449,7 @@ export default function ChatPage() {
               )}
 
               <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-[10px] text-[#333]">
+                <span className="text-[10px] text-[#999]">
                   {new Date(msg.timestamp).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
                 </span>
                 {/* 管理者用：既読表示 */}
@@ -479,26 +479,26 @@ export default function ChatPage() {
 
       {/* 編集モード */}
       {editingMsg && (
-        <div className="shrink-0 px-3 py-2 border-t border-[#1a1a1a] bg-[#0d0d0d] flex items-center gap-2">
-          <span className="text-xs text-[#666] shrink-0">編集中:</span>
+        <div className="shrink-0 px-3 py-2 border-t border-[#e5e5e5] bg-[#f8f8f8] flex items-center gap-2">
+          <span className="text-xs text-[#888] shrink-0">編集中:</span>
           <form onSubmit={submitEdit} className="flex-1 flex gap-2">
             <input
               ref={editInputRef}
               type="text"
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
-              className="flex-1 px-3 py-2 bg-[#141414] border border-[#222] rounded-lg text-white text-sm outline-none focus:border-[#444] transition"
+              className="flex-1 px-3 py-2 bg-white border border-[#ddd] rounded-lg text-[#111] text-sm outline-none focus:border-[#aaa] transition"
             />
-            <button type="submit" className="px-3 py-2 bg-white text-black text-xs font-bold rounded-lg">保存</button>
-            <button type="button" onClick={() => setEditingMsg(null)} className="px-3 py-2 text-xs text-[#666]">取消</button>
+            <button type="submit" className="px-3 py-2 bg-[#34d399] text-white text-xs font-bold rounded-lg">保存</button>
+            <button type="button" onClick={() => setEditingMsg(null)} className="px-3 py-2 text-xs text-[#999]">取消</button>
           </form>
         </div>
       )}
 
       {/* 入力欄 */}
-      <form onSubmit={sendMessage} className="shrink-0 flex items-end gap-2 p-3 border-t border-[#1a1a1a] bg-[#0a0a0a]">
+      <form onSubmit={sendMessage} className="shrink-0 flex items-end gap-2 p-3 border-t border-[#e5e5e5] bg-white">
         <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
-        <button type="button" onClick={() => fileInputRef.current?.click()} className="w-11 h-11 bg-[#141414] border border-[#222] rounded-xl flex items-center justify-center text-[#888] hover:text-white transition shrink-0">
+        <button type="button" onClick={() => fileInputRef.current?.click()} className="w-11 h-11 bg-[#f0f0f0] border border-[#ddd] rounded-xl flex items-center justify-center text-[#888] hover:text-[#555] transition shrink-0">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
           </svg>
@@ -513,9 +513,9 @@ export default function ChatPage() {
             setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 400);
           }}
           placeholder="メッセージ..."
-          className="flex-1 px-4 py-3 bg-[#141414] border border-[#222] rounded-xl text-white text-[15px] placeholder-[#444] outline-none focus:border-[#444] transition"
+          className="flex-1 px-4 py-3 bg-[#f0f0f0] border border-[#ddd] rounded-xl text-[#111] text-[15px] placeholder-[#aaa] outline-none focus:border-[#bbb] transition"
         />
-        <button type="submit" disabled={!newMessage.trim()} onMouseDown={(e) => e.preventDefault()} className="w-11 h-11 bg-white rounded-xl text-black flex items-center justify-center disabled:opacity-30 transition shrink-0">
+        <button type="submit" disabled={!newMessage.trim()} onMouseDown={(e) => e.preventDefault()} className="w-11 h-11 bg-[#34d399] rounded-xl text-white flex items-center justify-center disabled:opacity-30 transition shrink-0">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
           </svg>
