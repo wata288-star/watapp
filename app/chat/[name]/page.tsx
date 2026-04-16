@@ -276,10 +276,12 @@ export default function ChatPage() {
     if (!newMessage.trim()) return;
     getSocket().emit("chat-message", { roomId: roomIdRef.current, message: newMessage.trim(), type: "text" });
     setNewMessage("");
-    // キーボードを維持するためにフォーカスを戻す
-    requestAnimationFrame(() => {
-      msgInputRef.current?.focus();
-    });
+    // iOS/Android でキーボードを維持するため複数タイミングでフォーカスを戻す
+    const refocus = () => msgInputRef.current?.focus();
+    refocus();
+    requestAnimationFrame(refocus);
+    setTimeout(refocus, 50);
+    setTimeout(refocus, 150);
   };
 
   const startEdit = (msg: ChatMessage) => {
@@ -535,8 +537,8 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* 入力欄 */}
-      <form onSubmit={sendMessage} className="shrink-0 flex items-end gap-2 p-3 border-t border-[#e5e5e5] bg-white">
+      {/* 入力欄（formを使わず直接制御 → iOS/Androidでフォーカスが外れない） */}
+      <div className="shrink-0 flex items-end gap-2 p-3 border-t border-[#e5e5e5] bg-white">
         <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
         <button type="button" onClick={() => fileInputRef.current?.click()} className="w-11 h-11 bg-[#f0f0f0] border border-[#ddd] rounded-xl flex items-center justify-center text-[#888] hover:text-[#555] transition shrink-0">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -546,8 +548,15 @@ export default function ChatPage() {
         <input
           ref={msgInputRef}
           type="text"
+          enterKeyHint="send"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              sendMessage(e as unknown as React.FormEvent);
+            }
+          }}
           onFocus={() => {
             setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 150);
             setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 400);
@@ -555,12 +564,12 @@ export default function ChatPage() {
           placeholder="メッセージ..."
           className="flex-1 px-4 py-3 bg-[#f0f0f0] border border-[#ddd] rounded-xl text-[#111] text-[15px] placeholder-[#aaa] outline-none focus:border-[#bbb] transition"
         />
-        <button type="submit" disabled={!newMessage.trim()} onMouseDown={(e) => e.preventDefault()} className="w-11 h-11 bg-[#34d399] rounded-xl text-white flex items-center justify-center disabled:opacity-30 transition shrink-0">
+        <button type="button" disabled={!newMessage.trim()} onMouseDown={(e) => e.preventDefault()} onClick={() => sendMessage({ preventDefault: () => {} } as React.FormEvent)} className="w-11 h-11 bg-[#34d399] rounded-xl text-white flex items-center justify-center disabled:opacity-30 transition shrink-0">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
           </svg>
         </button>
-      </form>
+      </div>
     </div>
   );
 }
