@@ -1,11 +1,11 @@
 {
-  "name": "コラムノート - 暮らしのヒント",
-  "short_name": "コラムノート",
-  "description": "毎日のコラムをお届け",
+  "name": "Watapp",
+  "short_name": "Watapp",
+  "description": "プライベートメッセンジャー",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#0a0a0a",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "orientation": "portrait",
   "icons": [
     {

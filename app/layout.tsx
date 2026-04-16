@@ -13,13 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "コラムノート",
-  description: "暮らしのヒント",
+  title: "Watapp",
+  description: "プライベートメッセンジャー",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "コラムノート",
+    title: "Watapp",
   },
 };
 
