@@ -13,18 +13,18 @@ interface Contact {
 
 // ダミー記事データ（コラムアプリの偽装用）
 const ARTICLES = [
-  { id: 1, title: "朝5分の習慣が人生を変える｜今日から始める朝活のすすめ", author: "暮らしの知恵袋", likes: 342, date: "3時間前", img: "/art-1.jpg", cat: "ライフスタイル", avatar: "#f5a623" },
-  { id: 2, title: "無印良品で買ってよかったキッチングッズ10選", author: "シンプルライフ研究所", likes: 891, date: "5時間前", img: "/art-2.jpg", cat: "暮らし", avatar: "#7ed321" },
-  { id: 3, title: "読書嫌いだった私が年間100冊読めるようになった方法", author: "本のソムリエ", likes: 567, date: "8時間前", img: "/art-3.jpg", cat: "自己啓発", avatar: "#4a90d9" },
-  { id: 4, title: "一人暮らしの自炊｜週末2時間で平日5日分の作り置き", author: "ゆる自炊部", likes: 1203, date: "12時間前", img: "/art-4.jpg", cat: "料理", avatar: "#bd10e0" },
-  { id: 5, title: "在宅ワーク3年目でわかった、集中できる部屋づくり", author: "リモートワーカーの手帖", likes: 445, date: "1日前", img: "/art-5.jpg", cat: "仕事", avatar: "#f08c56" },
-  { id: 6, title: "スマホ断ちを1週間やってみた結果", author: "デジタルウェルネス", likes: 723, date: "1日前", img: "/art-6.jpg", cat: "ライフスタイル", avatar: "#50c8b4" },
-  { id: 7, title: "30代から始める資産形成｜まずやるべき3つのこと", author: "お金の教室", likes: 1567, date: "2日前", img: "/art-7.jpg", cat: "マネー", avatar: "#d0021b" },
+  { id: 1, title: "朝5分の習慣が人生を変える｜今日から始める朝活のすすめ", author: "暮らしの知恵袋", likes: 342, date: "3時間前", img: "/photo-1.jpg", cat: "ライフスタイル", avatar: "#f5a623" },
+  { id: 2, title: "無印良品で買ってよかったキッチングッズ10選", author: "シンプルライフ研究所", likes: 891, date: "5時間前", img: "/photo-2.jpg", cat: "暮らし", avatar: "#7ed321" },
+  { id: 3, title: "読書嫌いだった私が年間100冊読めるようになった方法", author: "本のソムリエ", likes: 567, date: "8時間前", img: "/photo-3.jpg", cat: "自己啓発", avatar: "#4a90d9" },
+  { id: 4, title: "一人暮らしの自炊｜週末2時間で平日5日分の作り置き", author: "ゆる自炊部", likes: 1203, date: "12時間前", img: "/photo-4.webp", cat: "料理", avatar: "#bd10e0" },
+  { id: 5, title: "在宅ワーク3年目でわかった、集中できる部屋づくり", author: "リモートワーカーの手帖", likes: 445, date: "1日前", img: "/photo-5.jpg", cat: "仕事", avatar: "#f08c56" },
+  { id: 6, title: "スマホ断ちを1週間やってみた結果", author: "デジタルウェルネス", likes: 723, date: "1日前", img: "/photo-6.jpg", cat: "ライフスタイル", avatar: "#50c8b4" },
+  { id: 7, title: "30代から始める資産形成｜まずやるべき3つのこと", author: "お金の教室", likes: 1567, date: "2日前", img: "/photo-7.jpg", cat: "マネー", avatar: "#d0021b" },
   { id: 8, title: "心が疲れた時に読みたい、気持ちが楽になる考え方", author: "こころの処方箋", likes: 2341, date: "2日前", img: "/art-8.jpg", cat: "メンタルヘルス", avatar: "#9013fe" },
   { id: 9, title: "IKEAの収納ハック｜6畳部屋を広く見せるテクニック", author: "収納マスター", likes: 678, date: "3日前", img: "/art-9.jpg", cat: "インテリア", avatar: "#b8e986" },
-  { id: 10, title: "コンビニで見つけた、仕事帰りのご褒美スイーツ5選", author: "スイーツ探検隊", likes: 432, date: "3日前", img: "/art-10.jpg", cat: "グルメ", avatar: "#f5a623" },
+  { id: 10, title: "コンビニで見つけた、仕事帰りのご褒美スイーツ5選", author: "スイーツ探検隊", likes: 432, date: "3日前", img: "/photo-10.jpg", cat: "グルメ", avatar: "#f5a623" },
   { id: 11, title: "睡眠の質が劇的に変わる｜寝る前の5つの習慣", author: "ぐっすり研究室", likes: 1890, date: "4日前", img: "/art-11.jpg", cat: "健康", avatar: "#4a90d9" },
-  { id: 12, title: "カフェ巡り好きが教える、東京の隠れ家カフェ8選", author: "カフェ散歩", likes: 534, date: "4日前", img: "/art-12.jpg", cat: "お出かけ", avatar: "#50c8b4" },
+  { id: 12, title: "カフェ巡り好きが教える、東京の隠れ家カフェ8選", author: "カフェ散歩", likes: 534, date: "4日前", img: "/photo-12.jpg", cat: "お出かけ", avatar: "#50c8b4" },
 ];
 
 const TRENDING_TAGS = ["朝活", "ミニマリスト", "作り置き", "在宅ワーク", "読書", "節約術"];
@@ -356,14 +356,14 @@ export default function Home() {
             <p className="text-xs text-[#999] mb-3 font-medium">カテゴリから探す</p>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { cat: "ライフスタイル", img: "/art-1.jpg" },
-                { cat: "料理", img: "/art-4.jpg" },
-                { cat: "仕事", img: "/art-5.jpg" },
+                { cat: "ライフスタイル", img: "/photo-1.jpg" },
+                { cat: "料理", img: "/photo-4.webp" },
+                { cat: "仕事", img: "/photo-5.jpg" },
                 { cat: "健康", img: "/art-11.jpg" },
-                { cat: "マネー", img: "/art-7.jpg" },
+                { cat: "マネー", img: "/photo-7.jpg" },
                 { cat: "インテリア", img: "/art-9.jpg" },
-                { cat: "自己啓発", img: "/art-3.jpg" },
-                { cat: "グルメ", img: "/art-10.jpg" },
+                { cat: "自己啓発", img: "/photo-3.jpg" },
+                { cat: "グルメ", img: "/photo-12.jpg" },
               ].map((item) => (
                 <div key={item.cat} className="relative rounded-xl overflow-hidden h-24">
                   <img src={item.img} alt="" className="w-full h-full object-cover" />
