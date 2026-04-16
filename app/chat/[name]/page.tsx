@@ -362,6 +362,16 @@ export default function ChatPage() {
   };
 
   const startCall = (withVideo: boolean) => {
+    // 相手に着信通知を送信
+    const socket = getSocket();
+    socket.emit("call-invite", {
+      targetUserId: contactUserId,
+      callType: withVideo ? "video" : "audio",
+    }, (res: { success: boolean; error?: string }) => {
+      if (!res.success) {
+        console.warn("call-invite failed:", res.error);
+      }
+    });
     const adminParam = isAdmin ? "&admin=1" : "";
     router.push(`/room/${encodeURIComponent(roomIdRef.current)}?username=${encodeURIComponent(myUsername)}&video=${withVideo}${adminParam}`);
   };

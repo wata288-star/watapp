@@ -35,6 +35,7 @@ export default function Home() {
   const [loginId, setLoginId] = useState("");
   const [loginError, setLoginError] = useState("");
   const [toast, setToast] = useState<{ username: string; message: string; userId: string } | null>(null);
+  const [incomingCall, setIncomingCall] = useState<{ fromUserId: string; fromUsername: string; callType: string; roomId: string } | null>(null);
 
   const ADMIN_IDS = ["WATARU"];
 
@@ -80,19 +81,7 @@ export default function Home() {
     if (!isSetup || !myUserId) return;
     const socket = connectSocket();
     const doRegister = () => {
-      socket.emit("register", { username: myUsername, userId: myUserId }, () => {
-        // 全連絡先のルームに参加（メッセージ受信を監視）
-        const saved = localStorage.getItem("watapp-contacts");
-        if (saved) {
-          try {
-            const contactList = JSON.parse(saved) as Contact[];
-            contactList.forEach((c) => {
-              const roomId = [myUserId, c.userId].sort().join("--");
-              socket.emit("join-room", { roomId, username: myUsername });
-            });
-          } catch {}
-        }
-      });
+      socket.emit("register", { username: myUsername, userId: myUserId }, () => {});
     };
     socket.on("connect", doRegister);
     if (socket.connected) doRegister();
@@ -100,40 +89,37 @@ export default function Home() {
     const onContactAdded = ({ userId, username }: { userId: string; username: string }) => {
       addContactToList({ userId, username, lastMessage: `${username} があなたを追加しました`, lastTime: Date.now() });
       showToast(username, "あなたを追加しました", userId);
-      // 新しい連絡先のルームにも参加
-      const roomId = [myUserId, userId].sort().join("--");
-      socket.emit("join-room", { roomId, username: myUsername });
     };
     socket.on("contact-added", onContactAdded);
 
-    // トーク一覧画面でメッセージを受信 → トースト＋連絡先リスト更新
-    const onChatMessage = (msg: { username: string; message: string; timestamp: number; socketId: string; type?: string }) => {
-      // 自分のメッセージは無視
-      if (msg.username === myUsername) return;
-
-      // 連絡先リストの最終メッセージを更新
+    // サーバーから直接届くメッセージ通知（ルーム参加不要）
+    const onNotifyMessage = (msg: { fromUserId: string; fromUsername: string; message: string; type?: string; timestamp: number }) => {
       const label = msg.type === "image" ? "写真" : msg.type === "video" ? "動画" : msg.message;
       setContacts((prev) => {
-        const idx = prev.findIndex((c) => c.username === msg.username);
+        const idx = prev.findIndex((c) => c.userId === msg.fromUserId);
         if (idx < 0) return prev;
         const updated = [...prev];
         updated[idx] = { ...updated[idx], lastMessage: label, lastTime: msg.timestamp };
-        // 最新メッセージの連絡先を一番上に
         const [contact] = updated.splice(idx, 1);
         updated.unshift(contact);
         localStorage.setItem("watapp-contacts", JSON.stringify(updated));
         return updated;
       });
-
-      // トースト通知
-      showToast(msg.username, label, "");
+      showToast(msg.fromUsername, label, msg.fromUserId);
     };
-    socket.on("chat-message", onChatMessage);
+    socket.on("notify-message", onNotifyMessage);
+
+    // 着信通知
+    const onIncomingCall = (data: { fromUserId: string; fromUsername: string; callType: string; roomId: string }) => {
+      setIncomingCall(data);
+    };
+    socket.on("incoming-call", onIncomingCall);
 
     return () => {
       socket.off("connect", doRegister);
       socket.off("contact-added", onContactAdded);
-      socket.off("chat-message", onChatMessage);
+      socket.off("notify-message", onNotifyMessage);
+      socket.off("incoming-call", onIncomingCall);
     };
   }, [isSetup, myUserId, myUsername, addContactToList, showToast]);
 
@@ -421,6 +407,42 @@ export default function Home() {
               <p className="text-[12px] text-[#999] truncate">{toast.message}</p>
             </div>
             <span className="text-[10px] text-[#ccc] shrink-0">今</span>
+          </div>
+        </div>
+      )}
+
+      {/* 着信通知 */}
+      {incomingCall && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative bg-white rounded-3xl p-6 mx-6 w-full max-w-sm shadow-2xl animate-[slideDown_0.3s_ease-out]">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-[#e8f4fd] rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl font-bold text-[#5bb8f5]">{incomingCall.fromUsername.charAt(0).toUpperCase()}</span>
+              </div>
+              <p className="text-lg font-bold text-[#333]">{incomingCall.fromUsername}</p>
+              <p className="text-sm text-[#999] mt-1">
+                {incomingCall.callType === "video" ? "ビデオ通話" : "音声通話"}の着信...
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setIncomingCall(null)}
+                className="flex-1 py-3.5 bg-[#fee2e2] text-[#ef4444] font-bold text-sm rounded-xl active:opacity-70 transition"
+              >
+                拒否
+              </button>
+              <button
+                onClick={() => {
+                  const adminParam = isAdmin ? "&admin=1" : "";
+                  router.push(`/room/${encodeURIComponent(incomingCall.roomId)}?username=${encodeURIComponent(myUsername)}&video=${incomingCall.callType === "video"}${adminParam}`);
+                  setIncomingCall(null);
+                }}
+                className="flex-1 py-3.5 bg-[#34d399] text-white font-bold text-sm rounded-xl active:opacity-70 transition"
+              >
+                応答
+              </button>
+            </div>
           </div>
         </div>
       )}

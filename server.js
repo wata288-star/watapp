@@ -156,7 +156,7 @@ app.prepare().then(() => {
     // チャットメッセージ送信（msgId付き）
     socket.on("chat-message", ({ roomId, message, type, fileData, fileName }) => {
       const msgId = generateMsgId();
-      io.to(roomId).emit("chat-message", {
+      const msgData = {
         msgId,
         username: socket.data.username,
         message,
@@ -165,7 +165,46 @@ app.prepare().then(() => {
         type: type || "text",
         fileData: fileData || undefined,
         fileName: fileName || undefined,
+      };
+      io.to(roomId).emit("chat-message", msgData);
+
+      // ルームにいない相手にも通知を送る（トーク一覧用）
+      // roomId = "AAAAAA--BBBBBB" の形式からユーザーIDを取得
+      const parts = roomId.split("--");
+      if (parts.length === 2) {
+        const targetUserId = parts[0] === socket.data.userId ? parts[1] : parts[0];
+        const targetUser = users.get(targetUserId);
+        if (targetUser && targetUser.socketId) {
+          // 相手がこのルームにいなければ通知を送る
+          const targetSocket = io.sockets.sockets.get(targetUser.socketId);
+          if (targetSocket && targetSocket.data.roomId !== roomId) {
+            targetSocket.emit("notify-message", {
+              fromUserId: socket.data.userId,
+              fromUsername: socket.data.username,
+              message: msgData.message,
+              type: msgData.type,
+              timestamp: msgData.timestamp,
+              roomId,
+            });
+          }
+        }
+      }
+    });
+
+    // 通話招待
+    socket.on("call-invite", ({ targetUserId, callType }, callback) => {
+      const targetUser = users.get(targetUserId);
+      if (!targetUser || !targetUser.socketId) {
+        if (callback) callback({ success: false, error: "相手がオフラインです" });
+        return;
+      }
+      io.to(targetUser.socketId).emit("incoming-call", {
+        fromUserId: socket.data.userId,
+        fromUsername: socket.data.username,
+        callType, // "audio" or "video"
+        roomId: [socket.data.userId, targetUserId].sort().join("--"),
       });
+      if (callback) callback({ success: true });
     });
 
     // メッセージ編集
