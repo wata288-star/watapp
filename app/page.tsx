@@ -34,8 +34,15 @@ export default function Home() {
   const [loginMode, setLoginMode] = useState<"new" | "id">("new");
   const [loginId, setLoginId] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [toast, setToast] = useState<{ username: string; message: string; userId: string } | null>(null);
 
   const ADMIN_IDS = ["WATARU"];
+
+  // トースト表示（3秒で自動消去）
+  const showToast = useCallback((username: string, message: string, userId: string) => {
+    setToast({ username, message, userId });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
 
   useEffect(() => {
     const savedAdmin = localStorage.getItem("watapp-admin");
@@ -73,19 +80,62 @@ export default function Home() {
     if (!isSetup || !myUserId) return;
     const socket = connectSocket();
     const doRegister = () => {
-      socket.emit("register", { username: myUsername, userId: myUserId }, () => {});
+      socket.emit("register", { username: myUsername, userId: myUserId }, () => {
+        // 全連絡先のルームに参加（メッセージ受信を監視）
+        const saved = localStorage.getItem("watapp-contacts");
+        if (saved) {
+          try {
+            const contactList = JSON.parse(saved) as Contact[];
+            contactList.forEach((c) => {
+              const roomId = [myUserId, c.userId].sort().join("--");
+              socket.emit("join-room", { roomId, username: myUsername });
+            });
+          } catch {}
+        }
+      });
     };
     socket.on("connect", doRegister);
     if (socket.connected) doRegister();
+
     const onContactAdded = ({ userId, username }: { userId: string; username: string }) => {
       addContactToList({ userId, username, lastMessage: `${username} があなたを追加しました`, lastTime: Date.now() });
+      showToast(username, "あなたを追加しました", userId);
+      // 新しい連絡先のルームにも参加
+      const roomId = [myUserId, userId].sort().join("--");
+      socket.emit("join-room", { roomId, username: myUsername });
     };
     socket.on("contact-added", onContactAdded);
+
+    // トーク一覧画面でメッセージを受信 → トースト＋連絡先リスト更新
+    const onChatMessage = (msg: { username: string; message: string; timestamp: number; socketId: string; type?: string }) => {
+      // 自分のメッセージは無視
+      if (msg.username === myUsername) return;
+
+      // 連絡先リストの最終メッセージを更新
+      const label = msg.type === "image" ? "写真" : msg.type === "video" ? "動画" : msg.message;
+      setContacts((prev) => {
+        const idx = prev.findIndex((c) => c.username === msg.username);
+        if (idx < 0) return prev;
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], lastMessage: label, lastTime: msg.timestamp };
+        // 最新メッセージの連絡先を一番上に
+        const [contact] = updated.splice(idx, 1);
+        updated.unshift(contact);
+        localStorage.setItem("watapp-contacts", JSON.stringify(updated));
+        return updated;
+      });
+
+      // トースト通知
+      showToast(msg.username, label, "");
+    };
+    socket.on("chat-message", onChatMessage);
+
     return () => {
       socket.off("connect", doRegister);
       socket.off("contact-added", onContactAdded);
+      socket.off("chat-message", onChatMessage);
     };
-  }, [isSetup, myUserId, myUsername, addContactToList]);
+  }, [isSetup, myUserId, myUsername, addContactToList, showToast]);
 
   const register = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -350,6 +400,30 @@ export default function Home() {
           ))
         )}
       </div>
+
+      {/* トースト通知 */}
+      {toast && (
+        <div className="fixed top-4 left-4 right-4 z-50 animate-[slideDown_0.3s_ease-out]">
+          <div
+            onClick={() => {
+              setToast(null);
+              // 該当する連絡先のチャットを開く
+              const contact = contacts.find((c) => c.username === toast.username);
+              if (contact) openChat(contact);
+            }}
+            className="bg-white rounded-2xl shadow-lg border border-[#e5e5e5] px-4 py-3 flex items-center gap-3 cursor-pointer active:bg-[#f8f8f8] transition"
+          >
+            <div className="w-10 h-10 bg-[#e8f4fd] rounded-full flex items-center justify-center shrink-0">
+              <span className="text-sm font-bold text-[#5bb8f5]">{toast.username.charAt(0).toUpperCase()}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-[#333]">{toast.username}</p>
+              <p className="text-[12px] text-[#999] truncate">{toast.message}</p>
+            </div>
+            <span className="text-[10px] text-[#ccc] shrink-0">今</span>
+          </div>
+        </div>
+      )}
 
       {/* コンテキストメニュー */}
       {contextMenu && (
