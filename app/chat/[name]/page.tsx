@@ -481,7 +481,7 @@ export default function ChatPage() {
                   onClick={() => isOwn && startEdit(msg)}
                   className={`max-w-[80%] px-3.5 py-2.5 text-[15px] leading-relaxed ${
                     isOwn
-                      ? "bg-[#82D955] text-black rounded-2xl rounded-br-sm cursor-pointer active:opacity-80"
+                      ? "bg-[#A8DFFF] text-black rounded-2xl rounded-br-sm cursor-pointer active:opacity-80"
                       : "bg-white text-[#111] rounded-2xl rounded-bl-sm"
                   }`}
                 >
