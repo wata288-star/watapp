@@ -296,21 +296,61 @@ export default function ChatPage() {
     setEditText("");
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 画像を圧縮してから送信（スマホ写真はそのままだとデカすぎる）
+  const compressImage = (file: File, maxWidth: number, quality: number): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth) {
+          h = Math.round(h * (maxWidth / w));
+          w = maxWidth;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("Canvas not supported")); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { alert("ファイルサイズは10MBまでです"); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      const type = file.type.startsWith("video/") ? "video" : "image";
-      getSocket().emit("chat-message", {
-        roomId: roomIdRef.current,
-        message: type === "image" ? "写真を送信しました" : "動画を送信しました",
-        type, fileData: base64, fileName: file.name,
-      });
-    };
-    reader.readAsDataURL(file);
+
+    const isVideo = file.type.startsWith("video/");
+
+    if (isVideo) {
+      // 動画は5MBまで（base64で膨らむため）
+      if (file.size > 5 * 1024 * 1024) { alert("動画は5MBまでです"); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        getSocket().emit("chat-message", {
+          roomId: roomIdRef.current,
+          message: "動画を送信しました",
+          type: "video", fileData: reader.result as string, fileName: file.name,
+        });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // 画像は圧縮してから送信
+      try {
+        const compressed = await compressImage(file, 1200, 0.7);
+        getSocket().emit("chat-message", {
+          roomId: roomIdRef.current,
+          message: "写真を送信しました",
+          type: "image", fileData: compressed, fileName: file.name,
+        });
+      } catch {
+        alert("画像の読み込みに失敗しました");
+      }
+    }
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
