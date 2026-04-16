@@ -1,7 +1,7 @@
 {
-  "name": "Watapp - 通話・チャット",
-  "short_name": "Watapp",
-  "description": "ブラウザで使える通話・チャットアプリ",
+  "name": "コラムノート - 暮らしのヒント",
+  "short_name": "コラムノート",
+  "description": "毎日のコラムをお届け",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0a",
