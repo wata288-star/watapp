@@ -184,16 +184,15 @@ export default function Home() {
     const doLogin = () => {
       socket.off("connect", doLogin);
       socket.emit("find-user", { userId: id }, (res: { found: boolean; userId?: string; username?: string }) => {
-        if (res.found && res.userId && res.username) {
-          socket.emit("register", { username: res.username, userId: res.userId }, (regRes: { userId: string; username: string }) => {
-            setMyUserId(regRes.userId); setMyUsername(regRes.username);
-            localStorage.setItem("watapp-username", regRes.username);
-            localStorage.setItem("watapp-userId", regRes.userId);
-            localStorage.removeItem("watapp-loggedOut");
-            if (ADMIN_IDS.includes(regRes.userId)) { setIsAdmin(true); localStorage.setItem("watapp-admin", "true"); }
-            setIsSetup(true); setIsRegistering(false);
-          });
-        } else { setLoginError("このIDのアカウントは見つかりません"); setIsRegistering(false); }
+        const username = res.found && res.username ? res.username : id;
+        socket.emit("register", { username, userId: id }, (regRes: { userId: string; username: string }) => {
+          setMyUserId(regRes.userId); setMyUsername(regRes.username);
+          localStorage.setItem("watapp-username", regRes.username);
+          localStorage.setItem("watapp-userId", regRes.userId);
+          localStorage.removeItem("watapp-loggedOut");
+          if (ADMIN_IDS.includes(regRes.userId)) { setIsAdmin(true); localStorage.setItem("watapp-admin", "true"); }
+          setIsSetup(true); setIsRegistering(false);
+        });
       });
     };
     socket.on("connect", doLogin);
