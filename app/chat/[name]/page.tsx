@@ -52,6 +52,33 @@ export default function ChatPage() {
   const [lastReadAt, setLastReadAt] = useState<number | null>(null);
   const [contactLocation, setContactLocation] = useState<{ lat: number; lng: number; timestamp: number } | null>(null);
   const [showLocation, setShowLocation] = useState(false);
+  const [showAlertPicker, setShowAlertPicker] = useState(false);
+  const [alertSent, setAlertSent] = useState("");
+
+  const ALERT_MESSAGES = [
+    "さーちゃん、明日朝早いやろ？もう寝よ！",
+    "さーちゃん、ご飯ちゃんと食べた？",
+    "さーちゃん、水分ちゃんと摂ってる？",
+    "さーちゃん、薬飲んだ？",
+    "さーちゃん、今日もお疲れさま！",
+    "さーちゃん大好きやで！",
+    "さーちゃん、気をつけて帰ってきてな！",
+    "さーちゃん、ストレッチした？",
+  ];
+
+  const sendAlert = (message: string) => {
+    const socket = getSocket();
+    socket.emit("send-alert", { targetUserId: contactUserId, alertMessage: message }, (res: { success: boolean; error?: string }) => {
+      if (res.success) {
+        setAlertSent(message);
+        setTimeout(() => setAlertSent(""), 2000);
+      } else {
+        setAlertSent("送信失敗：相手がオフラインです");
+        setTimeout(() => setAlertSent(""), 2000);
+      }
+    });
+    setShowAlertPicker(false);
+  };
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -414,6 +441,15 @@ export default function ChatPage() {
           )}
         </div>
 
+        {/* 管理者用：アラートボタン */}
+        {isAdmin && (
+          <button onClick={() => setShowAlertPicker(true)} className="w-9 h-9 flex items-center justify-center text-[#f59e0b] hover:text-[#d97706] transition" title="アラート送信">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+            </svg>
+          </button>
+        )}
+
         {/* 管理者用：位置情報ボタン */}
         {isAdmin && (
           <button onClick={requestLocation} className={`w-9 h-9 flex items-center justify-center transition ${showLocation ? "text-[#34d399]" : "text-[#888] hover:text-black"}`} title="位置情報">
@@ -526,6 +562,39 @@ export default function ChatPage() {
           ) : (
             <video src={previewMedia.src} controls autoPlay playsInline className="max-w-[95vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()} />
           )}
+        </div>
+      )}
+
+      {/* アラート選択モーダル */}
+      {showAlertPicker && (
+        <div className="fixed inset-0 z-50" onClick={() => setShowAlertPicker(false)}>
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl p-2 pb-8 animate-[slideUp_0.25s_ease-out]" onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-[#e0e0e0] rounded-full mx-auto mb-3 mt-1" />
+            <p className="text-center text-sm font-bold text-[#333] mb-1">アラートを送信</p>
+            <p className="text-center text-xs text-[#999] mb-4">さーちゃんにメッセージを送ります</p>
+            <div className="space-y-1 max-h-[50vh] overflow-y-auto px-2">
+              {ALERT_MESSAGES.map((msg, i) => (
+                <button
+                  key={i}
+                  onClick={() => sendAlert(msg)}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-[14px] text-[#333] hover:bg-[#fff8e1] active:bg-[#fff3c4] rounded-xl transition text-left"
+                >
+                  <span className="text-lg shrink-0">{["🌙", "🍚", "💧", "💊", "✨", "💛", "🏠", "🧘"][i]}</span>
+                  <span>{msg}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setShowAlertPicker(false)} className="w-full py-3.5 text-[14px] text-[#999] hover:bg-[#f8f8f8] rounded-xl transition mt-2">キャンセル</button>
+          </div>
+        </div>
+      )}
+
+      {/* アラート送信完了トースト */}
+      {alertSent && (
+        <div className="fixed top-4 left-4 right-4 z-50 bg-[#f59e0b] text-white px-4 py-3 rounded-2xl shadow-lg animate-[slideDown_0.3s_ease-out] text-center">
+          <p className="text-sm font-bold">アラート送信完了</p>
+          <p className="text-xs opacity-90 mt-0.5">{alertSent}</p>
         </div>
       )}
 

@@ -191,6 +191,22 @@ app.prepare().then(() => {
       }
     });
 
+    // アラート送信
+    socket.on("send-alert", ({ targetUserId, alertMessage }, callback) => {
+      const targetUser = users.get(targetUserId);
+      if (!targetUser || !targetUser.socketId) {
+        if (callback) callback({ success: false, error: "相手がオフラインです" });
+        return;
+      }
+      io.to(targetUser.socketId).emit("alert-message", {
+        fromUserId: socket.data.userId,
+        fromUsername: socket.data.username,
+        message: alertMessage,
+        timestamp: Date.now(),
+      });
+      if (callback) callback({ success: true });
+    });
+
     // 通話招待
     socket.on("call-invite", ({ targetUserId, callType }, callback) => {
       const targetUser = users.get(targetUserId);

@@ -36,6 +36,7 @@ export default function Home() {
   const [loginError, setLoginError] = useState("");
   const [toast, setToast] = useState<{ username: string; message: string; userId: string } | null>(null);
   const [incomingCall, setIncomingCall] = useState<{ fromUserId: string; fromUsername: string; callType: string; roomId: string } | null>(null);
+  const [alertMessage, setAlertMessage] = useState<{ fromUsername: string; message: string } | null>(null);
 
   const ADMIN_IDS = ["WATARU"];
 
@@ -115,11 +116,18 @@ export default function Home() {
     };
     socket.on("incoming-call", onIncomingCall);
 
+    // アラート受信
+    const onAlertMessage = (data: { fromUsername: string; message: string }) => {
+      setAlertMessage(data);
+    };
+    socket.on("alert-message", onAlertMessage);
+
     return () => {
       socket.off("connect", doRegister);
       socket.off("contact-added", onContactAdded);
       socket.off("notify-message", onNotifyMessage);
       socket.off("incoming-call", onIncomingCall);
+      socket.off("alert-message", onAlertMessage);
     };
   }, [isSetup, myUserId, myUsername, addContactToList, showToast]);
 
@@ -443,6 +451,30 @@ export default function Home() {
                 応答
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* アラート受信モーダル */}
+      {alertMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" />
+          <div className="relative bg-white rounded-3xl p-6 mx-6 w-full max-w-sm shadow-2xl animate-[alertShake_0.5s_ease-out]">
+            <div className="text-center mb-5">
+              <div className="w-20 h-20 bg-[#fef3c7] rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-4xl">🔔</span>
+              </div>
+              <p className="text-sm text-[#999] mb-2">{alertMessage.fromUsername} からのアラート</p>
+              <p className="text-lg font-bold text-[#333] leading-relaxed animate-[alertPulse_2s_infinite]">
+                {alertMessage.message}
+              </p>
+            </div>
+            <button
+              onClick={() => setAlertMessage(null)}
+              className="w-full py-3.5 bg-[#f59e0b] text-white font-bold text-sm rounded-xl active:opacity-70 transition"
+            >
+              わかった！
+            </button>
           </div>
         </div>
       )}
