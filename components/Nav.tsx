@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const ITEMS = [
   { href: "/", label: "ダッシュボード", icon: "M3 12l9-9 9 9M5 10v10h14V10" },
@@ -20,8 +20,17 @@ const ITEMS = [
 
 export function Nav() {
   const path = usePathname();
+  const router = useRouter();
+  if (path === "/login") return null;
+
+  const logout = async () => {
+    await fetch("/api/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  };
+
   return (
-    <nav className="md:w-60 md:min-h-dvh shrink-0 border-b md:border-b-0 md:border-r border-[var(--border)] bg-[var(--panel)] md:sticky md:top-0">
+    <nav className="md:w-60 md:min-h-dvh md:flex md:flex-col shrink-0 border-b md:border-b-0 md:border-r border-[var(--border)] bg-[var(--panel)] md:sticky md:top-0">
       <div className="px-5 py-5 flex items-center gap-2.5">
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#5b8cff] to-[#8b5bff] flex items-center justify-center font-black text-white text-sm">
           F
@@ -65,6 +74,17 @@ export function Nav() {
           );
         })}
       </ul>
+      <div className="hidden md:block md:mt-auto p-3">
+        <button
+          onClick={logout}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--text)] transition"
+        >
+          <svg width={18} height={18} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+          </svg>
+          ログアウト
+        </button>
+      </div>
     </nav>
   );
 }
