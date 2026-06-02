@@ -24,6 +24,17 @@ export interface Summary {
   usdjpy: number;
   counts: { assets: number; stocks: number; projects: number };
   pipeline: { open: number; won: number };
+  cashflow: { month: string; income: number; expense: number; net: number };
+  tasks: { open: number; done: number; dueSoon: number };
+  goals: {
+    id: number;
+    name: string;
+    kind: string;
+    target: number;
+    current: number;
+    progress: number;
+    deadline: string | null;
+  }[];
 }
 
 const CAT_LABELS: Record<string, string> = {
@@ -83,6 +94,65 @@ export function computeSummary(): Summary {
     else if (p.status !== "lost") open += p.amount;
   }
 
+  // 今月の収支
+  const month = todayISO().slice(0, 7);
+  const cf = db
+    .prepare(
+      `SELECT type, COALESCE(SUM(amount),0) AS total FROM transactions
+       WHERE substr(date,1,7) = ? GROUP BY type`,
+    )
+    .all(month) as unknown as { type: string; total: number }[];
+  let income = 0;
+  let expense = 0;
+  for (const r of cf) {
+    if (r.type === "income") income = r.total;
+    else expense = r.total;
+  }
+
+  // タスク
+  const tRows = db
+    .prepare("SELECT done, due_date FROM tasks")
+    .all() as unknown as { done: number; due_date: string | null }[];
+  const today = todayISO();
+  const soon = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+  let tOpen = 0;
+  let tDone = 0;
+  let dueSoon = 0;
+  for (const t of tRows) {
+    if (t.done) tDone++;
+    else {
+      tOpen++;
+      if (t.due_date && t.due_date <= soon && t.due_date >= today) dueSoon++;
+      else if (t.due_date && t.due_date < today) dueSoon++;
+    }
+  }
+
+  // 目標
+  const goalRows = db
+    .prepare("SELECT * FROM goals ORDER BY created_at ASC")
+    .all() as unknown as {
+    id: number;
+    name: string;
+    kind: string;
+    target_amount: number;
+    current_amount: number;
+    deadline: string | null;
+  }[];
+  const goals = goalRows.map((g) => {
+    const current = g.kind === "net_worth" ? netWorth : g.current_amount;
+    const progress =
+      g.target_amount > 0 ? (current / g.target_amount) * 100 : 0;
+    return {
+      id: g.id,
+      name: g.name,
+      kind: g.kind,
+      target: g.target_amount,
+      current,
+      progress,
+      deadline: g.deadline,
+    };
+  });
+
   return {
     netWorth,
     assetsTotal,
@@ -98,6 +168,9 @@ export function computeSummary(): Summary {
       projects: projects.length,
     },
     pipeline: { open, won },
+    cashflow: { month, income, expense, net: income - expense },
+    tasks: { open: tOpen, done: tDone, dueSoon },
+    goals,
   };
 }
 

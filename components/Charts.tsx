@@ -124,6 +124,68 @@ export function LineChart({
   );
 }
 
+/** 月次の収入/支出グループ棒グラフ */
+export function BarChart({
+  data,
+  height = 220,
+}: {
+  data: { label: string; income: number; expense: number }[];
+  height?: number;
+}) {
+  if (data.length === 0) {
+    return (
+      <div
+        className="flex items-center justify-center text-[var(--muted)] text-sm"
+        style={{ height }}
+      >
+        データがありません
+      </div>
+    );
+  }
+  const max = Math.max(...data.flatMap((d) => [d.income, d.expense]), 1);
+  return (
+    <div>
+      <div className="flex items-end gap-3" style={{ height }}>
+        {data.map((d, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+            <div className="flex items-end gap-1 w-full justify-center h-full">
+              <div
+                className="w-1/2 max-w-[22px] rounded-t"
+                style={{
+                  height: `${(d.income / max) * 100}%`,
+                  background: "#22c55e",
+                }}
+                title={`収入 ${Math.round(d.income).toLocaleString()}`}
+              />
+              <div
+                className="w-1/2 max-w-[22px] rounded-t"
+                style={{
+                  height: `${(d.expense / max) * 100}%`,
+                  background: "#f87171",
+                }}
+                title={`支出 ${Math.round(d.expense).toLocaleString()}`}
+              />
+            </div>
+            <span className="text-[10px] text-[var(--muted)] truncate w-full text-center">
+              {d.label}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-4 justify-center mt-3 text-[12px] text-[var(--muted)]">
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#22c55e" }} />
+          収入
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#f87171" }} />
+          支出
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /** ドーナツ（資産内訳） */
 export function DonutChart({
   data,

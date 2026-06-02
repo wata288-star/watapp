@@ -124,6 +124,79 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* 今月の収支・目標・タスク */}
+      <div className="grid md:grid-cols-3 gap-5">
+        <div className="card p-5">
+          <h2 className="font-bold text-[15px] mb-3">
+            今月の収支{" "}
+            <span className="text-[11px] text-[var(--muted)] font-normal">
+              {sum.cashflow.month}
+            </span>
+          </h2>
+          <div className="flex justify-between text-[13px] mb-1">
+            <span className="text-[var(--muted)]">収入</span>
+            <span className="pos">{yenShort(sum.cashflow.income)}</span>
+          </div>
+          <div className="flex justify-between text-[13px] mb-2">
+            <span className="text-[var(--muted)]">支出</span>
+            <span className="neg">{yenShort(sum.cashflow.expense)}</span>
+          </div>
+          <div className="flex justify-between text-[15px] font-bold border-t border-[var(--border)] pt-2">
+            <span>収支</span>
+            <span className={sum.cashflow.net >= 0 ? "pos" : "neg"}>
+              {yenShort(sum.cashflow.net)}
+            </span>
+          </div>
+        </div>
+
+        <div className="card p-5">
+          <h2 className="font-bold text-[15px] mb-3">目標</h2>
+          {sum.goals.length === 0 ? (
+            <p className="text-[13px] text-[var(--muted)]">
+              目標が未設定です
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {sum.goals.slice(0, 2).map((g) => (
+                <div key={g.id}>
+                  <div className="flex justify-between text-[13px] mb-1">
+                    <span className="truncate">{g.name}</span>
+                    <span className="text-[var(--muted)] shrink-0 ml-2">
+                      {g.progress.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-[var(--bg)] rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.max(0, Math.min(100, g.progress))}%`,
+                        background: g.progress >= 100 ? "#22c55e" : "#5b8cff",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="card p-5">
+          <h2 className="font-bold text-[15px] mb-3">タスク</h2>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black">{sum.tasks.open}</span>
+            <span className="text-[13px] text-[var(--muted)]">件 未完了</span>
+          </div>
+          {sum.tasks.dueSoon > 0 && (
+            <div className="text-[13px] neg mt-1">
+              ⚠ 期限間近・超過 {sum.tasks.dueSoon}件
+            </div>
+          )}
+          <div className="text-[12px] text-[var(--muted)] mt-1">
+            完了済 {sum.tasks.done}件
+          </div>
+        </div>
+      </div>
+
       <div className="text-[11px] text-[var(--muted)]">
         為替レート USD/JPY = {sum.usdjpy}（株式管理ページで更新可）
       </div>

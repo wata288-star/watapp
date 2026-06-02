@@ -9,6 +9,13 @@ const ITEMS = [
   { href: "/stocks", label: "株式管理", icon: "M4 18l5-6 4 4 7-9" },
   { href: "/projects", label: "案件管理", icon: "M4 6h16v4H4zM4 14h10v4H4z" },
   { href: "/trends", label: "資産推移", icon: "M3 17l6-6 4 4 8-8" },
+  {
+    href: "/cashflow",
+    label: "収支・家計",
+    icon: "M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6",
+  },
+  { href: "/goals", label: "目標・ゴール", icon: "M12 2a10 10 0 100 20 10 10 0 000-20zM12 8v4l3 2" },
+  { href: "/tasks", label: "タスク", icon: "M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" },
 ];
 
 export function Nav() {

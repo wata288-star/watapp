@@ -78,6 +78,38 @@ function migrate(d: DatabaseSync) {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'expense',
+      category TEXT NOT NULL DEFAULT 'other',
+      amount INTEGER NOT NULL DEFAULT 0,
+      memo TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS goals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'net_worth',
+      target_amount INTEGER NOT NULL DEFAULT 0,
+      current_amount INTEGER NOT NULL DEFAULT 0,
+      deadline TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      done INTEGER NOT NULL DEFAULT 0,
+      priority TEXT NOT NULL DEFAULT 'mid',
+      due_date TEXT,
+      project_id INTEGER,
+      note TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      done_at TEXT
+    );
   `);
 
   const hasRate = d
