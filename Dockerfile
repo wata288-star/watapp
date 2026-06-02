@@ -1,4 +1,5 @@
-FROM node:20-alpine
+# node:sqlite を使うため Node 22 以上が必須
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -8,11 +9,13 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-RUN npm prune --production
-
 EXPOSE 3000
 
 ENV NODE_ENV=production
 ENV PORT=3000
 
-CMD ["node", "server.js"]
+# DB(SQLite) は /app/data に作成される。永続化するにはボリュームをマウントすること:
+#   docker run -v flyheit-data:/app/data ...
+VOLUME ["/app/data"]
+
+CMD ["npm", "start"]

@@ -1,25 +1,23 @@
 {
-  "name": "call-app",
+  "name": "flyheit",
   "version": "0.1.0",
   "private": true,
+  "description": "株式会社FLYHEIT 人生管理システム",
   "scripts": {
-    "dev": "node server.js",
-    "dev:next": "next dev",
+    "dev": "next dev",
     "build": "next build",
-    "start": "NODE_ENV=production node server.js",
+    "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "next": "16.2.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "simple-peer": "^9.11.1",
-    "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3"
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^22.19.19",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
