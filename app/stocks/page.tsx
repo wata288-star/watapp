@@ -13,6 +13,7 @@ type Draft = {
   quantity: string;
   avg_cost: string;
   current_price: string;
+  annual_dividend: string;
   note: string;
 };
 
@@ -23,6 +24,7 @@ const EMPTY: Draft = {
   quantity: "",
   avg_cost: "",
   current_price: "",
+  annual_dividend: "",
   note: "",
 };
 
@@ -59,6 +61,12 @@ export default function StocksPage() {
   const totalCost = rows.reduce((a, s) => a + costJPY(s), 0);
   const totalPL = totalMV - totalCost;
   const totalPLpct = totalCost > 0 ? (totalPL / totalCost) * 100 : 0;
+  const divJPY = (s: Stock) => {
+    const d = s.quantity * (s.annual_dividend || 0);
+    return s.currency === "USD" ? d * rate : d;
+  };
+  const totalDiv = rows.reduce((a, s) => a + divJPY(s), 0);
+  const divYield = totalMV > 0 ? (totalDiv / totalMV) * 100 : 0;
 
   const save = async () => {
     if (!draft || !draft.symbol.trim()) return;
@@ -70,6 +78,7 @@ export default function StocksPage() {
       quantity: Number(draft.quantity) || 0,
       avg_cost: Number(draft.avg_cost) || 0,
       current_price: Number(draft.current_price) || 0,
+      annual_dividend: Number(draft.annual_dividend) || 0,
       note: draft.note,
     };
     await fetch(draft.id ? `/api/stocks/${draft.id}` : "/api/stocks", {
@@ -112,6 +121,7 @@ export default function StocksPage() {
       quantity: String(s.quantity),
       avg_cost: String(s.avg_cost),
       current_price: String(s.current_price),
+      annual_dividend: String(s.annual_dividend ?? 0),
       note: s.note ?? "",
     });
 
@@ -165,6 +175,11 @@ export default function StocksPage() {
           label="損益率"
           value={pct(totalPLpct)}
           cls={totalPL >= 0 ? "pos" : "neg"}
+        />
+        <Stat
+          label="年間配当"
+          value={yen(totalDiv)}
+          sub={`利回り ${pct(divYield)}`}
         />
       </div>
 
@@ -360,6 +375,20 @@ export default function StocksPage() {
               </div>
             </div>
             <div>
+              <label className="label">
+                年間配当（1株あたり・{draft.market === "US" ? "USD" : "JPY"}）
+              </label>
+              <input
+                className="input"
+                type="number"
+                value={draft.annual_dividend}
+                onChange={(e) =>
+                  setDraft({ ...draft, annual_dividend: e.target.value })
+                }
+                placeholder="例: トヨタなら 75"
+              />
+            </div>
+            <div>
               <label className="label">メモ</label>
               <textarea
                 className="textarea"
@@ -379,15 +408,18 @@ function Stat({
   label,
   value,
   cls = "",
+  sub,
 }: {
   label: string;
   value: string;
   cls?: string;
+  sub?: string;
 }) {
   return (
     <div className="card p-4">
       <div className="text-[12px] text-[var(--muted)]">{label}</div>
       <div className={`text-lg font-bold mt-1 ${cls}`}>{value}</div>
+      {sub && <div className="text-[12px] text-[var(--muted)] mt-0.5">{sub}</div>}
     </div>
   );
 }

@@ -12,7 +12,7 @@ export async function PATCH(
   const market = b.market === "US" ? "US" : "JP";
   const currency = market === "US" ? "USD" : "JPY";
   db.prepare(
-    `UPDATE stocks SET symbol=?, name=?, market=?, currency=?, quantity=?, avg_cost=?, current_price=?, note=?, updated_at=datetime('now') WHERE id=?`,
+    `UPDATE stocks SET symbol=?, name=?, market=?, currency=?, quantity=?, avg_cost=?, current_price=?, annual_dividend=?, note=?, updated_at=datetime('now') WHERE id=?`,
   ).run(
     String(b.symbol).trim().toUpperCase(),
     b.name?.trim() || String(b.symbol).trim().toUpperCase(),
@@ -21,6 +21,7 @@ export async function PATCH(
     Number(b.quantity) || 0,
     Number(b.avg_cost) || 0,
     Number(b.current_price) || 0,
+    Number(b.annual_dividend) || 0,
     b.note?.trim() || null,
     id,
   );

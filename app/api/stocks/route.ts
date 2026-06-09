@@ -19,8 +19,8 @@ export async function POST(req: Request) {
   const currency = market === "US" ? "USD" : "JPY";
   const info = db
     .prepare(
-      `INSERT INTO stocks (symbol, name, market, currency, quantity, avg_cost, current_price, note, price_updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      `INSERT INTO stocks (symbol, name, market, currency, quantity, avg_cost, current_price, annual_dividend, note, price_updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     )
     .run(
       String(b.symbol).trim().toUpperCase(),
@@ -30,6 +30,7 @@ export async function POST(req: Request) {
       Number(b.quantity) || 0,
       Number(b.avg_cost) || 0,
       Number(b.current_price) || 0,
+      Number(b.annual_dividend) || 0,
       b.note?.trim() || null,
     );
   const row = db

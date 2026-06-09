@@ -30,6 +30,7 @@ export interface Stock {
   quantity: number;
   avg_cost: number;
   current_price: number;
+  annual_dividend: number; // 1株あたり年間配当（現地通貨）
   note: string | null;
   price_updated_at: string | null;
   created_at: string;

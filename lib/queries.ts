@@ -13,12 +13,19 @@ export function stockCostJPY(s: Stock): number {
   return s.currency === "USD" ? c * usdjpy() : c;
 }
 
+export function stockAnnualDividendJPY(s: Stock): number {
+  const d = s.quantity * (s.annual_dividend || 0);
+  return s.currency === "USD" ? d * usdjpy() : d;
+}
+
 export interface Summary {
   netWorth: number;
   assetsTotal: number; // 現物資産（非負債、株式除く）
   stocksTotal: number; // 株式評価額(JPY)
   stocksCost: number;
   stocksPL: number;
+  annualDividend: number; // 年間配当(JPY)
+  dividendYield: number; // 配当利回り(%)
   liabilitiesTotal: number;
   breakdown: { key: string; label: string; value: number }[];
   usdjpy: number;
@@ -72,9 +79,11 @@ export function computeSummary(): Summary {
 
   let stocksTotal = 0;
   let stocksCost = 0;
+  let annualDividend = 0;
   for (const s of stocks) {
     stocksTotal += stockMarketValueJPY(s);
     stocksCost += stockCostJPY(s);
+    annualDividend += stockAnnualDividendJPY(s);
   }
   if (stocksTotal > 0) catMap.set("stocks", stocksTotal);
 
@@ -159,6 +168,8 @@ export function computeSummary(): Summary {
     stocksTotal,
     stocksCost,
     stocksPL: stocksTotal - stocksCost,
+    annualDividend,
+    dividendYield: stocksTotal > 0 ? (annualDividend / stocksTotal) * 100 : 0,
     liabilitiesTotal,
     breakdown,
     usdjpy: usdjpy(),
@@ -218,6 +229,16 @@ export function recordSnapshot(note?: string): Snapshot {
   return db
     .prepare("SELECT * FROM snapshots WHERE id = ?")
     .get(info.lastInsertRowid as number) as unknown as Snapshot;
+}
+
+// 当月のスナップショットがまだ無ければ自動で1件記録する。
+// ダッシュボード読み込み時に呼ばれ、推移グラフが自動で埋まる。
+export function ensureMonthlySnapshot(): void {
+  const month = todayISO().slice(0, 7);
+  const exists = db
+    .prepare("SELECT id FROM snapshots WHERE substr(date,1,7) = ?")
+    .get(month) as { id: number } | undefined;
+  if (!exists) recordSnapshot("自動記録");
 }
 
 export function listSnapshots(): Snapshot[] {

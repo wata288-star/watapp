@@ -20,6 +20,20 @@ function createDb(): DatabaseSync {
   return d;
 }
 
+function ensureColumn(
+  d: DatabaseSync,
+  table: string,
+  col: string,
+  def: string,
+) {
+  const cols = d
+    .prepare(`PRAGMA table_info(${table})`)
+    .all() as unknown as { name: string }[];
+  if (!cols.some((c) => c.name === col)) {
+    d.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+  }
+}
+
 function migrate(d: DatabaseSync) {
   d.exec(`
     CREATE TABLE IF NOT EXISTS assets (
@@ -42,6 +56,7 @@ function migrate(d: DatabaseSync) {
       quantity REAL NOT NULL DEFAULT 0,
       avg_cost REAL NOT NULL DEFAULT 0,
       current_price REAL NOT NULL DEFAULT 0,
+      annual_dividend REAL NOT NULL DEFAULT 0,
       note TEXT,
       price_updated_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -111,6 +126,9 @@ function migrate(d: DatabaseSync) {
       done_at TEXT
     );
   `);
+
+  // 既存DBへの後付けカラム（idempotent）
+  ensureColumn(d, "stocks", "annual_dividend", "REAL NOT NULL DEFAULT 0");
 
   const hasRate = d
     .prepare("SELECT value FROM settings WHERE key = ?")
