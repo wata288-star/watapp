@@ -1,48 +1,31 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { Nav } from "@/components/Nav";
 
 export const metadata: Metadata = {
-  title: "Watapp",
-  description: "プライベートメッセンジャー",
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Watapp",
-  },
+  title: "FLYHEIT 人生管理システム",
+  description: "株式会社FLYHEIT - 資産・株式・案件を統合管理するパーソナルダッシュボード",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  themeColor: "#ffffff",
-  interactiveWidget: "resizes-content",
+  themeColor: "#0b0f1a",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="ja"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-dvh flex flex-col">{children}</body>
+    <html lang="ja">
+      <body>
+        <div className="min-h-dvh flex flex-col md:flex-row">
+          <Nav />
+          <main className="flex-1 min-w-0 px-4 py-5 md:px-8 md:py-7 max-w-[1280px] w-full mx-auto">
+            {children}
+          </main>
+        </div>
+      </body>
     </html>
   );
 }
