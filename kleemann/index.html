@@ -550,7 +550,7 @@ function renderUserList() {
       </div>
       <div class="admin-user-email">${sanitize(u.email || '')}<span style="margin-left:10px;color:var(--gray-400);font-size:0.72rem;">登録: ${created}</span></div>
       ${isManager ? `<div class="admin-user-actions">
-        ${u.role === 'dealer' ? `<button onclick="openDealerPricing('${u.id}')" class="btn-sm">価格設定</button>` : ''}
+        ${u.role === 'dealer' ? `<button onclick="openDealerPricing('${u.id}')" class="btn-sm">💴 提示価格管理</button>` : ''}
         ${canEditTarget ? `<button onclick="adminChangeRole('${u.id}', '${u.role}')" class="btn-sm">ロール変更</button>` : ''}
         ${canEditTarget ? `<button onclick="adminToggleDisabled('${u.id}', ${!!u.disabled})" class="btn-sm" style="${u.disabled ? 'color:var(--success);' : 'color:#b91c1c;'}">${u.disabled ? '有効化' : '無効化'}</button>` : ''}
       </div>` : ''}
@@ -628,58 +628,100 @@ function renderDealerUsers() {
       </div>
       <div class="admin-user-email">${sanitize(u.email || '')}<span style="margin-left:10px;color:var(--gray-400);font-size:0.72rem;">登録: ${created}</span></div>
       ${isManager ? `<div class="admin-user-actions">
-        <button onclick="openDealerPricing('${u.id}')" class="btn-sm">価格設定</button>
+        <button onclick="openDealerPricing('${u.id}')" class="btn-sm" style="background:var(--blue-600);color:white;border-color:var(--blue-600);">💴 提示価格管理</button>
       </div>` : ''}
     </div>`;
   }).join('');
 }
 
-// ===== 管理者：代理店価格設定 =====
+// ===== 管理者：提示価格管理（代理店管理タブのインラインエディタ） =====
+let currentPricingDealerId = null;
+
 async function openDealerPricing(userId) {
   if (!can('manageDealers')) { showToast('この操作は管理者のみ実行できます', 'warning'); return; }
-  const userDoc = await db.collection('users').doc(userId).get();
-  if (!userDoc.exists) return;
-  const u = userDoc.data();
+  // 代理店管理タブに切り替えてエディタを開く（ユーザー管理タブ等から呼ばれた場合も集約）
+  showPage('admin');
+  showAdminTab('dealers');
+
+  let u = adminUsersCache.find(x => x.id === userId);
+  if (!u) {
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) { showToast('ユーザーが見つかりません', 'warning'); return; }
+    u = { id: userId, ...userDoc.data() };
+  }
+  currentPricingDealerId = userId;
   const config = u.dealerConfig || { priceMultiplier: 1.0, customPrices: {} };
 
-  const html = `
-    <h3 style="margin-bottom:1rem;color:var(--blue-900);">${sanitize(u.displayName)} — 価格設定</h3>
-    <div style="margin-bottom:1rem;">
-      <label style="font-weight:600;font-size:0.85rem;">掛率（例: 0.85 = 15%引き）</label>
-      <input type="number" id="dealer-multiplier" value="${config.priceMultiplier}" step="0.01" min="0.5" max="2.0"
-        style="width:120px;padding:8px;border:1px solid var(--gray-300);border-radius:8px;font-size:1rem;">
+  const editor = document.getElementById('dealer-pricing-editor');
+  editor.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:0.8rem;">
+      <h3 style="margin:0;font-size:1.05rem;color:var(--blue-900);">💴 提示価格管理 — ${sanitize(u.company || u.displayName || u.email || '')}</h3>
+      <button onclick="closeDealerPricingEditor()" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:1.1rem;padding:4px 8px;" title="閉じる">✕</button>
     </div>
-    <div style="margin-bottom:1rem;">
-      <label style="font-weight:600;font-size:0.85rem;">機種別特別価格</label>
-      <div id="dealer-custom-prices" style="max-height:300px;overflow-y:auto;">
-        ${products.map(p => `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--gray-100);">
-          <span style="flex:1;font-size:0.82rem;">${p.name}</span>
-          <input type="number" data-machine-id="${p.id}" value="${config.customPrices?.[p.id] || ''}" placeholder="${machinePrices[p.id] || '未設定'}"
-            style="width:140px;padding:6px;border:1px solid var(--gray-200);border-radius:6px;font-size:0.85rem;text-align:right;">
-        </div>`).join('')}
+    <p style="font-size:0.78rem;color:var(--gray-500);margin:0 0 1rem;">標準価格に掛率をかけた金額が提示価格になります。機種ごとに個別価格を入力するとそちらが優先されます。この代理店のユーザーには、ログイン時に下の「提示価格」が表示されます。</p>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap;">
+      <label style="font-weight:700;font-size:0.85rem;color:var(--gray-700);">掛率</label>
+      <input type="number" id="dpp-multiplier" value="${config.priceMultiplier ?? 1.0}" step="0.01" min="0.1" max="2.0"
+        oninput="updateDealerPricePreview()"
+        style="width:110px;padding:9px 12px;border:1px solid var(--gray-300);border-radius:8px;font-size:1rem;font-weight:700;text-align:center;">
+      <span style="font-size:0.75rem;color:var(--gray-400);">例: 0.85 = 標準価格の15%引きで提示</span>
+    </div>
+    <div style="border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;margin-bottom:1rem;">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;padding:10px 14px;background:var(--blue-900);color:white;font-size:0.78rem;font-weight:700;">
+        <span>機種名</span><span style="text-align:right;">標準価格</span><span style="text-align:right;">個別価格（任意）</span><span style="text-align:right;">→ 提示価格</span>
+      </div>
+      <div style="max-height:380px;overflow-y:auto;">
+        ${products.map(p => `
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;padding:8px 14px;border-bottom:1px solid var(--gray-100);align-items:center;">
+            <span style="font-size:0.85rem;font-weight:600;">${p.name}</span>
+            <span style="text-align:right;font-size:0.82rem;color:var(--gray-500);">¥${(machinePrices[p.id] || 0).toLocaleString()}</span>
+            <input type="number" id="dpp-custom-${p.id}" value="${config.customPrices?.[p.id] || ''}" placeholder="掛率適用"
+              oninput="updateDealerPricePreview()"
+              style="padding:7px 9px;border:1px solid var(--gray-200);border-radius:6px;font-size:0.82rem;text-align:right;width:100%;">
+            <span id="dpp-final-${p.id}" style="text-align:right;font-size:0.88rem;font-weight:700;color:var(--blue-800);"></span>
+          </div>`).join('')}
       </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button onclick="closeModal()" style="padding:10px 20px;background:var(--gray-200);border:none;border-radius:8px;cursor:pointer;font-weight:600;">キャンセル</button>
-      <button onclick="saveDealerPricing('${userId}')" style="padding:10px 20px;background:var(--blue-600);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;">保存</button>
+      <button onclick="closeDealerPricingEditor()" style="padding:10px 22px;background:var(--gray-200);border:none;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;">キャンセル</button>
+      <button onclick="saveDealerPricing()" style="padding:10px 22px;background:var(--blue-600);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;">提示価格を保存</button>
     </div>`;
-
-  // モーダルに表示
-  const modal = document.getElementById('modal');
-  const content = modal.querySelector('.modal-content') || modal;
-  content.innerHTML = html;
-  document.getElementById('modal-overlay').classList.add('active');
+  editor.style.display = '';
+  updateDealerPricePreview();
+  editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-async function saveDealerPricing(userId) {
+// 掛率・個別価格の入力に応じて提示価格をリアルタイム計算
+function updateDealerPricePreview() {
+  const mult = parseFloat(document.getElementById('dpp-multiplier')?.value) || 1.0;
+  products.forEach(p => {
+    const el = document.getElementById('dpp-final-' + p.id);
+    if (!el) return;
+    const base = machinePrices[p.id] || 0;
+    const customVal = parseInt(document.getElementById('dpp-custom-' + p.id)?.value);
+    const hasCustom = !isNaN(customVal) && customVal > 0;
+    const final = hasCustom ? customVal : Math.round(base * mult);
+    el.textContent = '¥' + final.toLocaleString();
+    el.style.color = hasCustom ? '#b45309' : 'var(--blue-800)';
+    el.title = hasCustom ? '個別価格' : '掛率適用';
+  });
+}
+
+function closeDealerPricingEditor() {
+  const editor = document.getElementById('dealer-pricing-editor');
+  if (editor) { editor.style.display = 'none'; editor.innerHTML = ''; }
+  currentPricingDealerId = null;
+}
+
+async function saveDealerPricing() {
   if (!can('manageDealers')) { showToast('この操作は管理者のみ実行できます', 'warning'); return; }
-  const multiplier = parseFloat(document.getElementById('dealer-multiplier').value) || 1.0;
+  const userId = currentPricingDealerId;
+  if (!userId) return;
+  const multiplier = parseFloat(document.getElementById('dpp-multiplier').value) || 1.0;
   const customPrices = {};
-  document.querySelectorAll('#dealer-custom-prices input[data-machine-id]').forEach(input => {
-    const val = parseInt(input.value);
-    if (!isNaN(val) && val > 0) {
-      customPrices[input.dataset.machineId] = val;
-    }
+  products.forEach(p => {
+    const val = parseInt(document.getElementById('dpp-custom-' + p.id)?.value);
+    if (!isNaN(val) && val > 0) customPrices[p.id] = val;
   });
 
   try {
@@ -688,8 +730,8 @@ async function saveDealerPricing(userId) {
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedBy: currentUser.uid
     });
-    showToast('代理店価格設定を保存しました', 'success');
-    closeModal();
+    showToast('提示価格を保存しました', 'success');
+    closeDealerPricingEditor();
     // キャッシュを更新して一覧に反映
     adminUsersCache = [];
     loadDealerUsers();
@@ -884,6 +926,12 @@ async function adminRegisterUser() {
     document.getElementById('admin-new-company').value = '';
     document.getElementById('admin-new-password').value = '';
     loadUserList();
+
+    // 代理店を作成した場合はそのまま提示価格管理を開く
+    if (finalRole === ROLE.DEALER) {
+      showToast('続けて提示価格（掛率・個別価格）を設定できます', 'success', 4000);
+      openDealerPricing(cred.user.uid);
+    }
   } catch (err) {
     const msgs = {
       'auth/email-already-in-use': 'このメールアドレスは既に登録されています',
@@ -1022,7 +1070,7 @@ async function confirmDealerRegister() {
       createdBy: currentUser.uid
     });
 
-    showToast(`代理店「${company}」（@${domain}）を登録しました`, 'success');
+    showToast(`代理店「${company}」（@${domain}）を登録しました。ユーザーが初回ログインすると下の一覧に表示され、提示価格管理から価格を設定できます`, 'success', 6000);
     document.getElementById('dealer-quick-company').value = '';
     document.getElementById('dealer-quick-domain').value = '';
     cancelDealerConfirm();
@@ -3901,6 +3949,9 @@ body {
         <div id="dealer-user-list" style="border:1px solid var(--gray-200);border-radius:12px;overflow:hidden;">
           <div style="padding:2rem;text-align:center;color:var(--gray-400);">読み込み中...</div>
         </div>
+
+        <!-- 提示価格管理（インラインエディタ・JSで表示） -->
+        <div id="dealer-pricing-editor" style="display:none;margin-top:1.2rem;background:var(--white);border:2px solid var(--blue-300);border-radius:12px;padding:1.2rem 1.5rem;box-shadow:var(--shadow-md);"></div>
       </div>
 
       <!-- 価格設定タブ -->
