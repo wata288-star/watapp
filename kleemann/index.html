@@ -38,7 +38,7 @@ const storage = firebase.storage();
 // dealer:     販売代理店 — カタログ・機種提案のみ
 const ROLE = { SUPER: 'superadmin', ADMIN: 'admin', EMPLOYEE: 'employee', DEALER: 'dealer' };
 const ROLE_LABELS = { superadmin: '総合管理者', admin: '日工社員（管理者）', employee: '日工社員（一般）', dealer: '販売代理店' };
-const SUPER_ADMIN_EMAIL = 'wata288@gmail.com'; // 総合管理者（固定・自動昇格）
+const SUPER_ADMIN_EMAIL = 'wataru.shinohara@nikko-net.co.jp'; // 総合管理者（固定・自動昇格）
 
 // ===== 権限マトリクス（一元管理）=====
 // ページ・機能ごとのアクセス可能ロールをここで定義する。
@@ -229,7 +229,7 @@ async function handleLogin(e) {
           try { savedProfile = JSON.parse(localStorage.getItem('nikko_user_profile')); } catch(e) {}
           if (savedProfile && savedProfile.displayName) {
             currentUser = u;
-            currentUserRole = ROLE.EMPLOYEE;
+            currentUserRole = (u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) ? ROLE.SUPER : ROLE.EMPLOYEE;
             hideLoginScreen();
             applyRolePermissions();
             loadCloudData().catch(() => {});
@@ -322,19 +322,22 @@ async function handleProfileSetup(e) {
     const user = auth.currentUser;
     if (!user) { errEl.textContent = 'ログイン情報が見つかりません'; return; }
 
+    // 総合管理者メールの初回登録は superadmin として保存
+    const profileRole = (user.email && user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) ? ROLE.SUPER : ROLE.EMPLOYEE;
+
     isInitialSetupInProgress = true;
     await db.collection('users').doc(user.uid).set({
       email: user.email,
       displayName: fullName,
       department: dept,
-      role: ROLE.EMPLOYEE,
+      role: profileRole,
       company: '日工株式会社',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     isInitialSetupInProgress = false;
 
     currentUser = user;
-    currentUserRole = ROLE.EMPLOYEE;
+    currentUserRole = profileRole;
     document.getElementById('profile-setup-overlay').style.display = 'none';
     hideLoginScreen();
     applyRolePermissions();
@@ -347,17 +350,18 @@ async function handleProfileSetup(e) {
     const user = auth.currentUser;
     if (user && user.email && user.email.toLowerCase().endsWith('@nikko-net.co.jp')) {
       console.log('Firestore書き込み失敗 → localStorageフォールバックで続行');
+      const fallbackRole = (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) ? ROLE.SUPER : ROLE.EMPLOYEE;
       try {
         localStorage.setItem('nikko_user_profile', JSON.stringify({
           email: user.email,
           displayName: fullName,
           department: dept,
-          role: ROLE.EMPLOYEE,
+          role: fallbackRole,
           company: '日工株式会社'
         }));
       } catch(lsErr) { /* localStorage失敗は無視 */ }
       currentUser = user;
-      currentUserRole = ROLE.EMPLOYEE;
+      currentUserRole = fallbackRole;
       document.getElementById('profile-setup-overlay').style.display = 'none';
       hideLoginScreen();
       applyRolePermissions();
