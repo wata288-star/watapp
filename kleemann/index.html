@@ -7590,57 +7590,7 @@ function buildSpecSheetHtml(idx) {
     </div>
   </div></div>`;
 
-  // ---------- 4ページ目: 御見積内容（見積シミュレーションと同内容） ----------
-  const fmt = v => '¥' + v.toLocaleString('ja-JP');
-  const unitPrice = machinePrices[item.id] || 0;
-  let itemRows = `<tr>
-    <td>機種本体　${model}</td>
-    <td style="text-align:center;">${item.qty}</td>
-    <td style="text-align:right;">${fmt(unitPrice * item.qty)}</td>
-  </tr>`;
-  let equipTotal = unitPrice * item.qty;
-  (item.options || []).forEach(optId => {
-    const opt = findOptionById(optId);
-    if (!opt) return;
-    const isStd = standardEquipment.includes(optId);
-    const optPrice = isStd ? 0 : (opt.price || 0) * item.qty;
-    equipTotal += optPrice;
-    itemRows += `<tr>
-      <td style="padding-left:1.6em;">■ ${sanitize(opt.name)}${isStd ? '（標準装備）' : ''}</td>
-      <td style="text-align:center;">${item.qty}</td>
-      <td style="text-align:right;">${isStd ? '本体価格に含む' : (opt.price > 0 ? fmt(optPrice) : '別途見積')}</td>
-    </tr>`;
-  });
-  const transportCost = parseInt(document.getElementById('est-transport-amount')?.value) || 0;
-  const guidanceCost = 1000000;
-  const discount = parseInt(document.getElementById('est-discount-amount')?.value) || 0;
-  const grandTotal = Math.max(0, equipTotal + transportCost + guidanceCost - discount);
-
-  const page4 = `
-  <div class="ss-page"><div class="ss-frame">
-    <div style="text-align:center;margin:0.5rem 0 1.8rem;"><span class="ss-title-box" style="font-size:1rem;padding:7px 40px;">御 見 積 内 容</span></div>
-    <div style="font-size:0.88rem;margin-bottom:1rem;">型　式：<span style="font-weight:700;">${model}</span></div>
-    <table class="ss-table" style="font-size:0.85rem;">
-      <thead><tr>
-        <th>品　名</th><th style="width:70px;">数量</th><th style="width:160px;">金　額（税別）</th>
-      </tr></thead>
-      <tbody>
-        ${itemRows}
-        <tr><td style="text-align:right;font-weight:700;">機器代 小計</td><td></td><td style="text-align:right;font-weight:700;">${fmt(equipTotal)}</td></tr>
-        <tr><td>輸送費</td><td style="text-align:center;">1式</td><td style="text-align:right;">${transportCost > 0 ? fmt(transportCost) : '別途'}</td></tr>
-        <tr><td>据付・試運転指導料</td><td style="text-align:center;">1式</td><td style="text-align:right;">${fmt(guidanceCost)}</td></tr>
-        ${discount > 0 ? `<tr><td>お値引き</td><td></td><td style="text-align:right;">▲ ${fmt(discount)}</td></tr>` : ''}
-        <tr class="ss-sec-row"><td style="text-align:right;">合　計（税別）</td><td></td><td style="text-align:right;font-size:1rem;">${fmt(grandTotal)}</td></tr>
-      </tbody>
-    </table>
-    <p style="font-size:0.75rem;color:#555;margin-top:1.2rem;line-height:1.9;">
-      ※ 上記金額は税別です。<br>
-      ※ 輸送費が「別途」の場合は、設置場所確定後に別途お見積り致します。<br>
-      ※ 本見積内容の有効期限は発行日より30日間です。
-    </p>
-  </div></div>`;
-
-  return cover + page2 + page3 + page4;
+  return cover + page2 + page3;
 }
 
 function openSpecSheet(idx) {
