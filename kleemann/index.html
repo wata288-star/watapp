@@ -2309,39 +2309,44 @@ body {
 .catalog-file-item { display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#f8f9fb;border-radius:6px;margin-bottom:4px;font-size:0.8rem; }
 
 /* ===== 見積仕様表 ===== */
-.ss-page { background:white;padding:14mm 16mm;margin:0 0 1.2rem;box-shadow:0 2px 12px rgba(0,0,0,0.15);font-family:'Inter','Hiragino Mincho ProN','Yu Mincho',serif;color:#1a1a1a;min-height:255mm;position:relative;box-sizing:border-box; }
-.ss-frame { border:2px solid #1a1a1a;outline:1px solid #1a1a1a;outline-offset:2px;padding:12mm 12mm;min-height:225mm;box-sizing:border-box; }
-.ss-title-box { border:3px double #1a1a1a;display:inline-block;padding:8px 28px;font-size:1.05rem;font-weight:700;letter-spacing:1px;margin:0 auto 2rem; }
-.ss-edit { border-bottom:1px dotted #888;min-width:60px;display:inline-block;padding:0 4px;outline:none; }
-.ss-edit:focus { background:#fffbdd; }
-.ss-edit:empty::before { content:'　　　　'; }
-.ss-underline { border-bottom:1.5px solid #1a1a1a;display:inline-block;padding:0 6px 2px; }
-.ss-h { font-size:0.92rem;font-weight:700;margin:1.2rem 0 0.5rem; }
-.ss-row { display:grid;grid-template-columns:150px 1fr;gap:6px;font-size:0.85rem;padding:2px 0; }
+.ss-page { width:210mm;max-width:100%;min-height:296mm;background:white;padding:12mm 14mm;margin:0 auto 1.2rem;box-shadow:0 2px 12px rgba(0,0,0,0.15);font-family:'Inter','Hiragino Mincho ProN','Yu Mincho',serif;color:#1a1a1a;box-sizing:border-box; }
+.ss-frame { border:2px solid #1a1a1a;outline:1px solid #1a1a1a;outline-offset:2px;padding:10mm 11mm;min-height:270mm;box-sizing:border-box;display:flex;flex-direction:column; }
+.ss-title-box { border:3px double #1a1a1a;padding:9px 32px;font-size:1.08rem;font-weight:700;letter-spacing:2px;display:inline-block; }
+.ss-line { display:flex;align-items:flex-end;gap:8px; }
+.ss-line > .cap { white-space:nowrap;padding-bottom:2px; }
+.ss-fill { flex:1;border-bottom:1.2px solid #1a1a1a;padding:0 8px 2px;min-height:1.35em;outline:none;line-height:1.5; }
+.ss-fill[contenteditable="true"]:hover { background:#f4f8ff; }
+.ss-fill[contenteditable="true"]:focus { background:#fffbdd; }
+.ss-h { font-size:0.92rem;font-weight:700;margin:1.1rem 0 0.45rem; }
+.ss-row { display:grid;grid-template-columns:160px 1fr;gap:10px;font-size:0.85rem;padding:2.5px 0; }
 .ss-row .lbl { text-align:right;color:#333; }
-.ss-table { width:100%;border-collapse:collapse;font-size:0.78rem;margin-top:0.4rem; }
+.ss-table { width:100%;border-collapse:collapse;font-size:0.78rem;margin-top:0.4rem;table-layout:fixed; }
 .ss-table th { border:1.5px solid #1a1a1a;background:#f2f2f2;padding:5px 8px;font-weight:700;text-align:center; }
-.ss-table td { border:1px solid #1a1a1a;padding:4px 8px;vertical-align:top;line-height:1.5; }
-.ss-table .ss-sec-row td { background:#e8e8e8;font-weight:700;border:1.5px solid #1a1a1a;padding:4px 8px; }
-.ss-table .unit { width:130px; }
-.ss-table .kubun { width:50px; }
-.ss-table .special { width:200px; }
-.ss-receipt { border:1.5px solid #1a1a1a;padding:14px 20px;max-width:420px;margin:2.2rem auto 0;font-size:0.85rem; }
+.ss-table td { border:1px solid #1a1a1a;padding:4px 8px;vertical-align:top;line-height:1.55;word-break:break-word; }
+.ss-table .ss-sec-row td { background:#e8e8e8;font-weight:700;border:1.5px solid #1a1a1a; }
+.ss-table .unit { width:120px; }
+.ss-table .kubun { width:42px; }
+.ss-table .special { width:180px; }
+.ss-receipt { border:1.5px solid #1a1a1a;padding:16px 24px;width:400px;max-width:100%;margin:2.4rem auto 0;font-size:0.85rem;box-sizing:border-box; }
 .ss-approve { border-collapse:collapse;font-size:0.72rem;margin-left:auto; }
-.ss-approve th, .ss-approve td { border:1px solid #1a1a1a;text-align:center;padding:3px 8px;white-space:nowrap; }
-.ss-approve td { height:52px;width:58px;vertical-align:bottom; }
-.ss-terms p { font-size:0.82rem;line-height:1.9;margin:0.2rem 0; }
-.ss-terms ol { font-size:0.82rem;line-height:1.9;padding-left:1.4rem;margin:0.2rem 0; }
+.ss-approve th, .ss-approve td { border:1px solid #1a1a1a;text-align:center;padding:3px 10px;white-space:nowrap; }
+.ss-approve td { height:52px;min-width:56px;vertical-align:bottom; }
+.ss-terms p { font-size:0.83rem;line-height:2;margin:0.2rem 0; }
+.ss-terms ol { font-size:0.83rem;line-height:2;padding-left:1.5rem;margin:0.2rem 0; }
 @media print {
   body.spec-print-mode .header, body.spec-print-mode .mobile-nav, body.spec-print-mode .main,
-  body.spec-print-mode .compare-bar, body.spec-print-mode .toast-container { display:none !important; }
+  body.spec-print-mode .compare-bar, body.spec-print-mode .toast-container,
+  body.spec-print-mode #login-overlay, body.spec-print-mode #profile-setup-overlay,
+  body.spec-print-mode .modal-overlay, body.spec-print-mode #est-preview-overlay { display:none !important; }
   body.spec-print-mode #spec-preview-overlay { display:block !important;position:static !important;background:none !important;padding:0 !important;backdrop-filter:none !important; }
   body.spec-print-mode #spec-preview-overlay .est-preview-modal { max-width:none !important;background:white !important;box-shadow:none !important;border-radius:0 !important; }
   body.spec-print-mode #spec-preview-overlay .est-preview-toolbar { display:none !important; }
   body.spec-print-mode #spec-preview-overlay .est-preview-paper { margin:0 !important;padding:0 !important;background:white !important; }
-  body.spec-print-mode .ss-page { box-shadow:none !important;margin:0 !important;padding:4mm 2mm !important;min-height:auto;page-break-after:always; }
+  body.spec-print-mode .ss-page { width:auto !important;min-height:auto !important;box-shadow:none !important;margin:0 !important;padding:0 !important;page-break-after:always; }
   body.spec-print-mode .ss-page:last-child { page-break-after:auto; }
-  body.spec-print-mode .ss-frame { min-height:255mm; }
+  body.spec-print-mode .ss-frame { min-height:265mm; }
+  body.spec-print-mode .ss-table tr { page-break-inside:avoid; }
+  body.spec-print-mode .ss-fill { background:none !important; }
 }
 
 /* ===== FEATURE 5: PRINT ===== */
@@ -7303,8 +7308,8 @@ function toWareki(d) {
   return `令和${y === 1 ? '元' : y}年${d.getMonth() + 1}月${d.getDate()}日`;
 }
 
-function ssEdit(value, width) {
-  return `<span class="ss-edit" contenteditable="true" style="min-width:${width || 80}px;">${sanitize(value || '')}</span>`;
+function ssFill(value, style) {
+  return `<span class="ss-fill" contenteditable="true" style="${style || ''}">${sanitize(value || '')}</span>`;
 }
 
 function buildSpecSheetHtml(idx) {
@@ -7330,31 +7335,71 @@ function buildSpecSheetHtml(idx) {
 
   // ---------- 1ページ目: 表紙 ----------
   const cover = `
-  <div class="ss-page"><div class="ss-frame" style="display:flex;flex-direction:column;">
-    <div style="text-align:center;"><div class="ss-title-box">Kleemann製${catName}見積仕様表</div></div>
-    <div style="font-size:1.15rem;font-weight:700;margin-bottom:1.2rem;"><span class="ss-underline" style="min-width:280px;">${ssEdit(company, 220)}　殿</span></div>
-    <div style="text-align:right;font-size:0.88rem;margin-bottom:1rem;">御担当者：　${ssEdit(person, 130)}　殿</div>
-    <div class="ss-row"><span class="lbl">本　　社：</span><span>${ssEdit('', 260)}　TEL ${ssEdit('', 110)}</span></div>
-    <div class="ss-row"><span class="lbl">設置場所：</span><span>${ssEdit(loc, 260)}　TEL ${ssEdit('', 110)}</span></div>
-    <div class="ss-row" style="margin-top:0.8rem;"><span class="lbl">機　　種：</span><span></span></div>
-    <div class="ss-row"><span class="lbl">型　　式：</span><span class="ss-underline" style="font-weight:700;">${model}</span></div>
-    <div style="margin-top:2.2rem;font-size:0.88rem;">
-      <div style="margin-bottom:0.5rem;">作成日　<span class="ss-underline">${today}</span></div>
-      <div style="margin-bottom:0.5rem;padding-left:3.2rem;">${ssEdit('令和　年　月　日', 150)}　（現地搬入）</div>
-      <div style="padding-left:3.2rem;">${ssEdit('令和　年　月　日', 150)}　（試運転完了）</div>
+  <div class="ss-page"><div class="ss-frame">
+    <div style="text-align:center;margin:0.5rem 0 2.2rem;"><span class="ss-title-box">Kleemann製${catName}見積仕様表</span></div>
+
+    <div class="ss-line" style="max-width:420px;font-size:1.12rem;font-weight:700;margin-bottom:0.8rem;">
+      ${ssFill(company, 'font-size:1.12rem;')}<span class="cap">殿</span>
     </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:1.4rem;">
+      <div class="ss-line" style="width:300px;font-size:0.9rem;">
+        <span class="cap">御担当者：</span>${ssFill(person, 'text-align:center;')}<span class="cap">殿</span>
+      </div>
+    </div>
+
+    <div class="ss-line" style="font-size:0.9rem;margin-bottom:0.8rem;">
+      <span class="cap" style="width:88px;">本　　社：</span>${ssFill('')}
+      <span class="cap">TEL</span>${ssFill('', 'max-width:140px;')}
+    </div>
+    <div class="ss-line" style="font-size:0.9rem;margin-bottom:1.6rem;">
+      <span class="cap" style="width:88px;">設置場所：</span>${ssFill(loc)}
+      <span class="cap">TEL</span>${ssFill('', 'max-width:140px;')}
+    </div>
+
+    <div style="font-size:0.9rem;margin-bottom:1.8rem;">
+      <div style="margin-bottom:0.4rem;">機　　種</div>
+      <div class="ss-line" style="margin-left:64px;max-width:480px;">
+        <span class="cap">型　式：</span><span class="ss-fill" style="font-weight:700;">${model}</span>
+      </div>
+    </div>
+
+    <div style="font-size:0.9rem;">
+      <div class="ss-line" style="max-width:330px;margin-bottom:0.7rem;">
+        <span class="cap">作成日</span><span class="ss-fill" style="text-align:center;">${today}</span>
+      </div>
+      <div class="ss-line" style="max-width:330px;margin:0 0 0.7rem 56px;">
+        ${ssFill('令和　年　月　日', 'text-align:center;')}<span class="cap" style="font-size:0.82rem;">（現地搬入）</span>
+      </div>
+      <div class="ss-line" style="max-width:330px;margin-left:56px;">
+        ${ssFill('令和　年　月　日', 'text-align:center;')}<span class="cap" style="font-size:0.82rem;">（試運転完了）</span>
+      </div>
+    </div>
+
     <div class="ss-receipt">
-      <div style="font-weight:700;margin-bottom:0.8rem;">御受領欄</div>
-      <div style="margin-bottom:1.2rem;">御受領日　<span class="ss-underline" style="min-width:180px;">${ssEdit('　　年　　月　　日', 160)}</span></div>
-      <div style="text-align:center;line-height:2;">${ssEdit('（住所）', 240)}<br>${ssEdit('（会社名）', 240)}<br>${ssEdit('（部署・氏名）', 200)}　印</div>
+      <div style="font-weight:700;margin-bottom:1rem;">御受領欄</div>
+      <div class="ss-line" style="max-width:300px;margin:0 auto 1.4rem;">
+        <span class="cap">御受領日</span>${ssFill('　年　　月　　日', 'text-align:center;')}
+      </div>
+      <div style="max-width:300px;margin:0 auto;">
+        <div class="ss-line" style="margin-bottom:0.7rem;">${ssFill('', 'text-align:center;')}</div>
+        <div class="ss-line" style="margin-bottom:0.7rem;">${ssFill('', 'text-align:center;')}</div>
+        <div class="ss-line">${ssFill('', 'text-align:center;')}<span class="cap">印</span></div>
+      </div>
+      <div style="max-width:300px;margin:4px auto 0;display:grid;grid-template-columns:1fr 1fr 1fr;font-size:0.68rem;color:#888;text-align:center;">
+        <span>住所</span><span>会社名</span><span>部署・氏名</span>
+      </div>
     </div>
-    <div style="margin-top:auto;padding-top:1.5rem;">
-      <div style="text-align:right;font-size:1rem;font-weight:700;margin-bottom:0.3rem;">日工株式会社</div>
-      <table class="ss-approve">
-        <tr><th colspan="4">MP営業部</th></tr>
-        <tr><th>部長</th><th>課長</th><th>リーダー</th><th>担当</th></tr>
-        <tr><td></td><td></td><td></td><td></td></tr>
-      </table>
+
+    <div style="margin-top:auto;padding-top:1.6rem;">
+      <div style="width:280px;margin-left:auto;">
+        <div style="text-align:center;font-size:1rem;font-weight:700;margin-bottom:0.3rem;">日工株式会社</div>
+        <table class="ss-approve" style="margin:0 auto;">
+          <tr><th colspan="4">MP営業部</th></tr>
+          <tr><th>部長</th><th>課長</th><th>リーダー</th><th>担当</th></tr>
+          <tr><td></td><td></td><td></td><td></td></tr>
+        </table>
+      </div>
     </div>
   </div></div>`;
 
