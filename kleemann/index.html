@@ -2308,6 +2308,42 @@ body {
 .catalog-file-list { margin-top:0.8rem; }
 .catalog-file-item { display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#f8f9fb;border-radius:6px;margin-bottom:4px;font-size:0.8rem; }
 
+/* ===== 見積仕様表 ===== */
+.ss-page { background:white;padding:14mm 16mm;margin:0 0 1.2rem;box-shadow:0 2px 12px rgba(0,0,0,0.15);font-family:'Inter','Hiragino Mincho ProN','Yu Mincho',serif;color:#1a1a1a;min-height:255mm;position:relative;box-sizing:border-box; }
+.ss-frame { border:2px solid #1a1a1a;outline:1px solid #1a1a1a;outline-offset:2px;padding:12mm 12mm;min-height:225mm;box-sizing:border-box; }
+.ss-title-box { border:3px double #1a1a1a;display:inline-block;padding:8px 28px;font-size:1.05rem;font-weight:700;letter-spacing:1px;margin:0 auto 2rem; }
+.ss-edit { border-bottom:1px dotted #888;min-width:60px;display:inline-block;padding:0 4px;outline:none; }
+.ss-edit:focus { background:#fffbdd; }
+.ss-edit:empty::before { content:'　　　　'; }
+.ss-underline { border-bottom:1.5px solid #1a1a1a;display:inline-block;padding:0 6px 2px; }
+.ss-h { font-size:0.92rem;font-weight:700;margin:1.2rem 0 0.5rem; }
+.ss-row { display:grid;grid-template-columns:150px 1fr;gap:6px;font-size:0.85rem;padding:2px 0; }
+.ss-row .lbl { text-align:right;color:#333; }
+.ss-table { width:100%;border-collapse:collapse;font-size:0.78rem;margin-top:0.4rem; }
+.ss-table th { border:1.5px solid #1a1a1a;background:#f2f2f2;padding:5px 8px;font-weight:700;text-align:center; }
+.ss-table td { border:1px solid #1a1a1a;padding:4px 8px;vertical-align:top;line-height:1.5; }
+.ss-table .ss-sec-row td { background:#e8e8e8;font-weight:700;border:1.5px solid #1a1a1a;padding:4px 8px; }
+.ss-table .unit { width:130px; }
+.ss-table .kubun { width:50px; }
+.ss-table .special { width:200px; }
+.ss-receipt { border:1.5px solid #1a1a1a;padding:14px 20px;max-width:420px;margin:2.2rem 0 0;font-size:0.85rem; }
+.ss-approve { border-collapse:collapse;font-size:0.72rem;margin-left:auto; }
+.ss-approve th, .ss-approve td { border:1px solid #1a1a1a;text-align:center;padding:3px 8px;white-space:nowrap; }
+.ss-approve td { height:52px;width:58px;vertical-align:bottom; }
+.ss-terms p { font-size:0.82rem;line-height:1.9;margin:0.2rem 0; }
+.ss-terms ol { font-size:0.82rem;line-height:1.9;padding-left:1.4rem;margin:0.2rem 0; }
+@media print {
+  body.spec-print-mode .header, body.spec-print-mode .mobile-nav, body.spec-print-mode .main,
+  body.spec-print-mode .compare-bar, body.spec-print-mode .toast-container { display:none !important; }
+  body.spec-print-mode #spec-preview-overlay { display:block !important;position:static !important;background:none !important;padding:0 !important;backdrop-filter:none !important; }
+  body.spec-print-mode #spec-preview-overlay .est-preview-modal { max-width:none !important;background:white !important;box-shadow:none !important;border-radius:0 !important; }
+  body.spec-print-mode #spec-preview-overlay .est-preview-toolbar { display:none !important; }
+  body.spec-print-mode #spec-preview-overlay .est-preview-paper { margin:0 !important;padding:0 !important;background:white !important; }
+  body.spec-print-mode .ss-page { box-shadow:none !important;margin:0 !important;padding:4mm 2mm !important;min-height:auto;page-break-after:always; }
+  body.spec-print-mode .ss-page:last-child { page-break-after:auto; }
+  body.spec-print-mode .ss-frame { min-height:255mm; }
+}
+
 /* ===== FEATURE 5: PRINT ===== */
 .btn-print { padding:10px 20px;background:var(--blue-900);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer;font-weight:600;font-size:0.85rem;transition:var(--transition); }
 .btn-print:hover { background:var(--blue-700); }
@@ -2552,6 +2588,19 @@ body {
 <div class="toast-container" id="toast-container"></div>
 
 <!-- 見積書プレビューモーダル -->
+<div class="est-preview-overlay" id="spec-preview-overlay" style="display:none;" onclick="if(event.target===this)closeSpecSheet();">
+  <div class="est-preview-modal" style="max-width:900px;">
+    <div class="est-preview-toolbar">
+      <span class="est-preview-toolbar-title">見積仕様表プレビュー（点線の欄は印刷前にクリックして直接編集できます）</span>
+      <div style="display:flex;gap:8px;">
+        <button class="est-preview-btn" onclick="window.print();">🖨 印刷 / PDF保存</button>
+        <button class="est-preview-btn close" onclick="closeSpecSheet();">✕ 閉じる</button>
+      </div>
+    </div>
+    <div class="est-preview-paper" id="spec-preview-paper" style="padding:0;background:var(--gray-200);box-shadow:none;"></div>
+  </div>
+</div>
+
 <div class="est-preview-overlay" id="est-preview-overlay" style="display:none;" onclick="if(event.target===this)closeEstimatePreview();">
   <div class="est-preview-modal">
     <div class="est-preview-toolbar">
@@ -6992,6 +7041,7 @@ function updateEstimateList() {
         <div class="nk-machine-actions">
           <button class="nk-action-btn preview" onclick="openEstimatePreview(${idx})">プレビュー</button>
           <button class="nk-action-btn print" onclick="printSingleEstimate(${idx})">見積書を印刷</button>
+          <button class="nk-action-btn preview" onclick="openSpecSheet(${idx})" style="border-color:var(--success);color:#065f46;">📋 見積仕様表</button>
         </div>
       </div>`;
   }).join('');
@@ -7241,6 +7291,186 @@ function openEstimatePreview(idx) {
   paper.innerHTML = buildSingleEstimateHtml(idx);
   document.getElementById('est-preview-overlay').style.display = 'flex';
   document.body.style.overflow = 'hidden';
+}
+
+// =====================================================================
+// 見積仕様表（納入仕様書）ジェネレータ
+// 見積シミュレーションの内容（機種・オプション・顧客情報）から
+// SA9009形式の見積仕様表を自動生成する
+// =====================================================================
+function toWareki(d) {
+  const y = d.getFullYear() - 2018;
+  return `令和${y === 1 ? '元' : y}年${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+function ssEdit(value, width) {
+  return `<span class="ss-edit" contenteditable="true" style="min-width:${width || 80}px;">${sanitize(value || '')}</span>`;
+}
+
+function buildSpecSheetHtml(idx) {
+  const item = estimateList[idx];
+  if (!item) return '';
+  const p = products.find(x => x.id === item.id);
+  const ss = machineSpecSheet[item.id];
+  const model = ss?.model || p?.name || '';
+  const catMap = { jaw: '自走式ジョークラッシャー', impact: '自走式インパクトクラッシャー', cone: '自走式コーンクラッシャー', screen: '自走式スクリーン' };
+  const catName = catMap[p?.category] || '自走式クラッシャー';
+
+  const company = document.getElementById('est-customer-company')?.value || '';
+  const person = document.getElementById('est-customer-person')?.value || '';
+  const loc = document.getElementById('est-location')?.value || '';
+  const today = toWareki(new Date());
+
+  // 選択オプション（■=選択済み・標準装備）
+  const selectedOpts = (item.options || []).map(optId => {
+    const opt = findOptionById(optId);
+    if (!opt) return null;
+    return { name: opt.name, std: standardEquipment.includes(optId) };
+  }).filter(Boolean);
+
+  // ---------- 1ページ目: 表紙 ----------
+  const cover = `
+  <div class="ss-page"><div class="ss-frame" style="display:flex;flex-direction:column;">
+    <div style="text-align:center;"><div class="ss-title-box">Kleemann製${catName}見積仕様表</div></div>
+    <div style="font-size:1.15rem;font-weight:700;margin-bottom:1.2rem;"><span class="ss-underline" style="min-width:280px;">${ssEdit(company, 220)}　殿</span></div>
+    <div style="text-align:right;font-size:0.88rem;margin-bottom:1rem;">御担当者：　${ssEdit(person, 130)}　殿</div>
+    <div class="ss-row"><span class="lbl">本　　社：</span><span>${ssEdit('', 260)}　TEL ${ssEdit('', 110)}</span></div>
+    <div class="ss-row"><span class="lbl">設置場所：</span><span>${ssEdit(loc, 260)}　TEL ${ssEdit('', 110)}</span></div>
+    <div class="ss-row" style="margin-top:0.8rem;"><span class="lbl">機　　種：</span><span></span></div>
+    <div class="ss-row"><span class="lbl">型　　式：</span><span class="ss-underline" style="font-weight:700;">${model}</span></div>
+    <div style="margin-top:2.2rem;font-size:0.88rem;">
+      <div style="margin-bottom:0.5rem;">作成日　<span class="ss-underline">${today}</span></div>
+      <div style="margin-bottom:0.5rem;padding-left:3.2rem;">${ssEdit('令和　年　月　日', 150)}　（現地搬入）</div>
+      <div style="padding-left:3.2rem;">${ssEdit('令和　年　月　日', 150)}　（試運転完了）</div>
+    </div>
+    <div class="ss-receipt">
+      <div style="font-weight:700;margin-bottom:0.8rem;">御受領欄</div>
+      <div style="margin-bottom:1.2rem;">御受領日　<span class="ss-underline" style="min-width:180px;">${ssEdit('　　年　　月　　日', 160)}</span></div>
+      <div style="text-align:center;line-height:2;">${ssEdit('（住所）', 240)}<br>${ssEdit('（会社名）', 240)}<br>${ssEdit('（部署・氏名）', 200)}　印</div>
+    </div>
+    <div style="margin-top:auto;padding-top:1.5rem;">
+      <div style="text-align:right;font-size:1rem;font-weight:700;margin-bottom:0.3rem;">日工株式会社</div>
+      <table class="ss-approve">
+        <tr><th colspan="4">MP営業部</th></tr>
+        <tr><th>部長</th><th>課長</th><th>リーダー</th><th>担当</th></tr>
+        <tr><td></td><td></td><td></td><td></td></tr>
+      </table>
+    </div>
+  </div></div>`;
+
+  // ---------- 2ページ目: 概略構成 ----------
+  let outline = '';
+  if (ss && ss.sections) {
+    const bySec = name => ss.sections.find(sec => sec.name === name);
+    const body = bySec('車輌本体');
+    const bodyRows = body ? body.rows.map(r => `<div class="ss-row"><span class="lbl">${r[0]}</span><span>${r[1]}</span></div>`).join('') : '';
+    // 構成機器: 車輌本体・走行装置・機関装置・その他 以外のセクションの型式(または先頭行)を要約
+    const skip = ['車輌本体', '走行装置', '機関装置', 'その他'];
+    const compRows = ss.sections.filter(sec => !skip.includes(sec.name)).map(sec => {
+      const type = sec.rows.find(r => r[0] === '型式') || sec.rows[0];
+      return `<div class="ss-row"><span class="lbl">${sec.name}</span><span>${type[1]}</span></div>`;
+    }).join('');
+    const engine = bySec('機関装置');
+    const engineRows = engine ? engine.rows.filter(r => !r[0].includes('ブレーキ')).map(r => `<div class="ss-row"><span class="lbl">${r[0]}</span><span>${r[1]}</span></div>`).join('') : '';
+    const crawler = bySec('走行装置');
+    const crawlerRows = crawler ? crawler.rows.slice(0, 3).map(r => `<div class="ss-row"><span class="lbl">${r[0]}</span><span>${r[1]}</span></div>`).join('') : '';
+    outline = `
+      <div class="ss-h">車輌本体</div>${bodyRows}
+      <div class="ss-h">構成機器</div>${compRows}
+      <div class="ss-h">駆動装置</div>${engineRows}
+      <div class="ss-h">走行装置</div>${crawlerRows}`;
+  } else if (p && p.specs) {
+    outline = '<div class="ss-h">主要諸元</div>' + Object.entries(p.specs).filter(([k]) => k !== 'fuel')
+      .map(([k, v]) => `<div class="ss-row"><span class="lbl">${specLabel(k)}</span><span>${v}</span></div>`).join('');
+  }
+  const optOutline = selectedOpts.length > 0
+    ? selectedOpts.map(o => `<div class="ss-row"><span class="lbl"></span><span>■ ${sanitize(o.name)}${o.std ? '（標準装備）' : ''}</span></div>`).join('')
+    : '<div class="ss-row"><span class="lbl"></span><span>—</span></div>';
+
+  const page2 = `
+  <div class="ss-page"><div class="ss-frame">
+    <div style="font-size:0.9rem;line-height:2.2;">
+      <div>Ⅰ．名　　称　　${catName}</div>
+      <div>Ⅱ．型　　式　　${model}</div>
+      <div>Ⅲ．概 略 構 成</div>
+    </div>
+    ${outline}
+    <div class="ss-h">オプション装置</div>${optOutline}
+  </div></div>`;
+
+  // ---------- 3ページ目: 保証・納入・引渡し検収（定型文） ----------
+  const page3 = `
+  <div class="ss-page"><div class="ss-frame ss-terms">
+    <div class="ss-h">Ⅳ．保　　証</div>
+    <p>試運転開始後 6ヶ月以内、又は500時間以内のどちらか早い方で、明らかに当方の設計製作上の不備に基づく構造、機能の不良、破損に対しては無償整備を行います。<br>
+    但し、消耗品及び取扱不備による事故・故障は対象外です。<br>
+    また、製造された製品の保証及び操業停止等による損害補償は対象外とさせて頂きます。</p>
+    <div class="ss-h">Ⅴ．納　　入</div>
+    <p>本機の納入・据付時には荷降ろし場所及び据付場所の整地と確保が行われているものと致します。</p>
+    <div class="ss-h">Ⅵ．引渡し・検収</div>
+    <ol>
+      <li>弊社は引渡期限までに、本機を引渡場所にて貴社へ引渡し完了するものと致します。</li>
+      <li>貴社は引渡しを受けた後、直ちに装置が本仕様表に適合しているかの検査（検収）を実施して下さい。</li>
+      <li>検査の結果、本機から被破砕物が正常に排出されるなど製品の生産が可能な場合は、仮に手直し箇所が存在したとしても検収と致します。この場合、貴社は弊社に検収書を交付するものと致します。なお、弊社の過失に起因する手直し箇所については、弊社は責任をもってすみやかに対処致します。</li>
+      <li>検査の結果、プラントから規定量の被破砕物が生産できない場合は、検収に該当せず、弊社はすみやかに本仕様表に合致するよう補修等を行うものと致します。この場合、貴社も、弊社の行う補修に応じるものと致します。</li>
+    </ol>
+    <div style="margin-top:2rem;">
+      <div style="font-weight:700;font-size:0.85rem;">特殊仕様欄の記号に関して</div>
+      <p style="padding-left:1.5rem;">■：仕様に含まれているもの<br>□：仕様に含まれていないもの</p>
+    </div>
+  </div></div>`;
+
+  // ---------- 4ページ目〜: 装置別仕様 ----------
+  let detailRows = '';
+  if (ss && ss.sections) {
+    ss.sections.forEach(sec => {
+      detailRows += `<tr class="ss-sec-row"><td colspan="4">${sec.name}</td></tr>`;
+      sec.rows.forEach(r => {
+        if (r[0] === '特殊仕様') {
+          detailRows += `<tr><td class="unit">特記事項</td><td class="kubun"></td><td></td><td class="special">${r[1]}</td></tr>`;
+        } else {
+          detailRows += `<tr><td class="unit">${r[0]}</td><td class="kubun"></td><td>${r[1]}</td><td class="special"></td></tr>`;
+        }
+      });
+    });
+  } else if (p && p.specs) {
+    detailRows += `<tr class="ss-sec-row"><td colspan="4">主要諸元</td></tr>`;
+    Object.entries(p.specs).filter(([k]) => k !== 'fuel').forEach(([k, v]) => {
+      detailRows += `<tr><td class="unit">${specLabel(k)}</td><td class="kubun"></td><td>${v}</td><td class="special"></td></tr>`;
+    });
+  }
+  if (selectedOpts.length > 0) {
+    detailRows += `<tr class="ss-sec-row"><td colspan="4">選択オプション装置</td></tr>`;
+    selectedOpts.forEach(o => {
+      detailRows += `<tr><td class="unit">オプション</td><td class="kubun"></td><td>${sanitize(o.name)}</td><td class="special">■ ${o.std ? '標準装備' : '仕様に含む'}</td></tr>`;
+    });
+  }
+  const page4 = `
+  <div class="ss-page">
+    <div style="font-size:1rem;font-weight:700;margin-bottom:0.4rem;">A．${model}　装置別仕様</div>
+    <table class="ss-table">
+      <thead><tr><th class="unit">ユニット名</th><th class="kubun">区分</th><th>仕　様　内　容</th><th class="special">特殊仕様</th></tr></thead>
+      <tbody>${detailRows}</tbody>
+    </table>
+    ${!ss ? '<p style="font-size:0.72rem;color:#888;margin-top:0.6rem;">※ この機種の装置別詳細データは未登録のため主要諸元を表示しています。詳細は担当営業までお問い合わせください。</p>' : ''}
+  </div>`;
+
+  return cover + page2 + page3 + page4;
+}
+
+function openSpecSheet(idx) {
+  const html = buildSpecSheetHtml(idx);
+  if (!html) { showToast('見積アイテムが見つかりません', 'warning'); return; }
+  document.getElementById('spec-preview-paper').innerHTML = html;
+  document.getElementById('spec-preview-overlay').style.display = 'flex';
+  document.body.classList.add('spec-print-mode');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSpecSheet() {
+  document.getElementById('spec-preview-overlay').style.display = 'none';
+  document.body.classList.remove('spec-print-mode');
+  document.body.style.overflow = '';
 }
 
 function printSingleEstimate(idx) {
