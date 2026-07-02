@@ -1,0 +1,124 @@
+rules_version = '2';
+
+// KLEEMANN営業支援ツール Firestoreセキュリティルール（4ロール制対応）
+//
+// ロール: superadmin（総合管理者・メール固定） / admin（日工社員・管理者）
+//         / employee（日工社員・一般） / dealer（販売代理店）
+//
+// 適用方法: Firebaseコンソール → Firestore Database → ルール に全文貼り付けて「公開」
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===== 共通ヘルパー =====
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    // 総合管理者（固定メール）。usersドキュメントが無くても判定できるようトークンのメールで判定
+    function isSuper() {
+      return isSignedIn()
+        && request.auth.token.email.lower() == 'wataru.shinohara@nikko-net.co.jp';
+    }
+    function myDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function myDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    function myRole() {
+      return myDocExists() ? myDoc().role : '';
+    }
+    function isActive() {
+      return myDocExists() && myDoc().disabled != true;
+    }
+    function isAdmin() {
+      return isSuper() || (isActive() && myRole() == 'admin');
+    }
+    function isStaff() {
+      return isAdmin() || (isActive() && myRole() == 'employee');
+    }
+    function isNikkoEmail() {
+      return request.auth.token.email.lower().matches('.*@nikko-net\\.co\\.jp');
+    }
+
+    // ===== users: ユーザー情報 =====
+    match /users/{userId} {
+      // 読み取り: 自分自身 or 管理者以上（ユーザー管理画面）
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      // 作成:
+      //  1) 総合管理者の自己作成（自動昇格）
+      //  2) 日工社員の初回プロフィール登録（employee固定）
+      //  3) 代理店の自己作成（登録済みドメインに限る）
+      //  4) 管理者による他ユーザー作成（管理者ロールの作成は総合管理者のみ）
+      allow create: if isSignedIn() && (
+        (request.auth.uid == userId && isSuper() && request.resource.data.role == 'superadmin')
+        || (request.auth.uid == userId && isNikkoEmail() && request.resource.data.role == 'employee')
+        || (request.auth.uid == userId
+            && request.resource.data.role == 'dealer'
+            && request.resource.data.dealerDomain is string
+            && exists(/databases/$(database)/documents/dealerDomains/$(request.resource.data.dealerDomain)))
+        || (isAdmin() && request.resource.data.role in ['employee', 'dealer'])
+        || (isSuper() && request.resource.data.role in ['admin', 'employee', 'dealer'])
+      );
+
+      // 更新:
+      //  1) 総合管理者は何でも可（自動昇格・ロール変更・無効化を含む）
+      //  2) 本人はプロフィール項目のみ（role/disabled/dealerConfigは変更不可）
+      //  3) 管理者は superadmin 以外を更新可。ただしロールを admin に付与/剥奪する変更は不可
+      allow update: if isSignedIn() && (
+        isSuper()
+        || (request.auth.uid == userId
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['displayName', 'department', 'favorites', 'updatedAt']))
+        || (isAdmin()
+            && resource.data.role != 'superadmin'
+            && request.resource.data.role != 'superadmin'
+            && (request.resource.data.role == resource.data.role
+                || (resource.data.role != 'admin' && request.resource.data.role != 'admin')))
+      );
+
+      allow delete: if isSuper();
+    }
+
+    // ===== dealerDomains: 代理店ドメイン登録 =====
+    match /dealerDomains/{domain} {
+      // ログイン時のドメイン自動判定に必要なため、認証済みなら読み取り可
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ===== invitations: 招待レコード =====
+    match /invitations/{email} {
+      allow read, write: if isAdmin();
+    }
+
+    // ===== settings: 価格・製品コンテンツ =====
+    match /settings/{doc} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ===== rcParts: ランニングコスト部品単価 =====
+    match /rcParts/{doc} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ===== quotes: 商談データ =====
+    match /quotes/{quoteId} {
+      allow read, create, update, delete: if isStaff();
+    }
+
+    // ===== siteSettings: 共有設定（原価等の機密データ） =====
+    match /siteSettings/{doc} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // 上記以外は全拒否
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

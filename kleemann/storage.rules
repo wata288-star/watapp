@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// KLEEMANN営業支援ツール Firebase Storageセキュリティルール
+// 適用方法: Firebaseコンソール → Storage → ルール に全文貼り付けて「公開」
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isSuper() {
+      return isSignedIn()
+        && request.auth.token.email.lower() == 'wataru.shinohara@nikko-net.co.jp';
+    }
+    // Firestoreのusersドキュメントを参照してロール判定（クロスサービスルール）
+    function isAdmin() {
+      return isSuper() || (
+        isSignedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.disabled != true
+      );
+    }
+
+    // カタログPDF: 閲覧はログインユーザー全員、アップロード/削除は管理者のみ
+    match /catalogs/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 製品動画: 同上
+    match /videos/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 上記以外は全拒否
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
