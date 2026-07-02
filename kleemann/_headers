@@ -1,0 +1,6 @@
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com https://www.google.com https://www.gstatic.com https://apis.google.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://img.youtube.com https://*.ytimg.com blob: https://firebasestorage.googleapis.com https://*.firebasestorage.app; frame-src https://www.youtube.com https://www.youtube-nocookie.com blob: https://*.firebaseapp.com; media-src 'self' blob: data: https://firebasestorage.googleapis.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com wss://*.firebaseio.com https://firebasestorage.googleapis.com https://*.firebasestorage.app https://api.allorigins.win https://nominatim.openstreetmap.org https://info.gbiz.go.jp;
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

@@ -1,11 +1,16 @@
 rules_version = '2';
 
-// KLEEMANN営業支援ツール Firestoreセキュリティルール（4ロール制対応）
+// KLEEMANN営業支援ツール Firestoreセキュリティルール（4ロール制対応・v4）
 //
 // ロール: superadmin（総合管理者・メール固定） / admin（日工社員・管理者）
 //         / employee（日工社員・一般） / dealer（販売代理店）
 //
+// アプリ実装(compat SDK)の全コレクションアクセスと突き合わせて作成:
+//   users / dealerDomains / invitations / settings / siteSettings
+//   / confidential / quotes / catalogFiles / videoFiles
+//
 // 適用方法: Firebaseコンソール → Firestore Database → ルール に全文貼り付けて「公開」
+//   または firebase deploy --only firestore:rules
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -34,6 +39,7 @@ service cloud.firestore {
     function isAdmin() {
       return isSuper() || (isActive() && myRole() == 'admin');
     }
+    // 社員以上（一般社員を含む・代理店は含まない）
     function isStaff() {
       return isAdmin() || (isActive() && myRole() == 'employee');
     }
@@ -65,7 +71,7 @@ service cloud.firestore {
       // 更新:
       //  1) 総合管理者は何でも可（自動昇格・ロール変更・無効化を含む）
       //  2) 本人はプロフィール項目のみ（role/disabled/dealerConfigは変更不可）
-      //  3) 管理者は superadmin 以外を更新可。ただしロールを admin に付与/剥奪する変更は不可
+      //  3) 管理者は superadmin 以外を更新可。ただしロールの admin への付与/剥奪は不可
       allow update: if isSignedIn() && (
         isSuper()
         || (request.auth.uid == userId
@@ -93,26 +99,41 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    // ===== settings: 価格・製品コンテンツ =====
+    // ===== settings: 価格(products)・製品コンテンツ(productContent) =====
     match /settings/{doc} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    // ===== rcParts: ランニングコスト部品単価 =====
-    match /rcParts/{doc} {
-      allow read: if isStaff();
+    // ===== siteSettings: 共有データ(JSON文字列) =====
+    // prices / opt_prices / highlights / techdata / youtube は管理者のみ書き込み。
+    // stamps(電子印)は社員も保存するため社員以上に許可
+    match /siteSettings/{key} {
+      allow read: if isSignedIn();
+      allow write: if key == 'stamps' ? isStaff() : isAdmin();
+    }
+
+    // ===== confidential: 原価データ(machine_costs, option_costs) =====
+    // 管理者のみ。非管理者は permission-denied → アプリ側でフォールバック値が使われる(正常動作)
+    match /confidential/{key} {
+      allow read, write: if isAdmin();
+    }
+
+    // ===== quotes: 商談・マイ見積(ownerUidで本人判定) =====
+    match /quotes/{quoteId} {
+      allow create: if isStaff() && request.resource.data.ownerUid == request.auth.uid;
+      allow read, update, delete: if isStaff()
+        && (resource.data.ownerUid == request.auth.uid || isAdmin());
+    }
+
+    // ===== catalogFiles / videoFiles: Storageファイルのメタ情報 =====
+    // 閲覧は全ログインユーザー(カタログ・動画表示)、管理は管理者のみ
+    match /catalogFiles/{doc} {
+      allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-
-    // ===== quotes: 商談データ =====
-    match /quotes/{quoteId} {
-      allow read, create, update, delete: if isStaff();
-    }
-
-    // ===== siteSettings: 共有設定（原価等の機密データ） =====
-    match /siteSettings/{doc} {
-      allow read: if isStaff();
+    match /videoFiles/{doc} {
+      allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
