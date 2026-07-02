@@ -31,30 +31,36 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
 
-// ===== ロール定数 =====
-const ROLE = { ADMIN: 'admin', EMPLOYEE: 'employee', DEALER: 'dealer' };
-const ROLE_LABELS = { admin: '管理者', employee: '日工社員', dealer: '販売代理店' };
+// ===== ロール定数（4ロール制）=====
+// superadmin: 総合管理者（SUPER_ADMIN_EMAIL 固定・ログイン時に自動昇格）
+// admin:      日工社員（管理者）— 管理画面にアクセス可
+// employee:   日工社員（一般）— 営業機能のみ（管理画面は不可）
+// dealer:     販売代理店 — カタログ・機種提案のみ
+const ROLE = { SUPER: 'superadmin', ADMIN: 'admin', EMPLOYEE: 'employee', DEALER: 'dealer' };
+const ROLE_LABELS = { superadmin: '総合管理者', admin: '日工社員（管理者）', employee: '日工社員（一般）', dealer: '販売代理店' };
+const SUPER_ADMIN_EMAIL = 'wata288@gmail.com'; // 総合管理者（固定・自動昇格）
 
 // ===== 権限マトリクス（一元管理）=====
 // ページ・機能ごとのアクセス可能ロールをここで定義する。
 // 権限を変更する場合はこの2つの表だけを編集すればアプリ全体に反映される。
 const PAGE_ACCESS = {
-  'catalog':      [ROLE.ADMIN, ROLE.EMPLOYEE, ROLE.DEALER],
-  'proposal':     [ROLE.ADMIN, ROLE.EMPLOYEE, ROLE.DEALER],
-  'running-cost': [ROLE.ADMIN, ROLE.EMPLOYEE],
-  'simulator':    [ROLE.ADMIN, ROLE.EMPLOYEE],
-  'estimate':     [ROLE.ADMIN, ROLE.EMPLOYEE],
-  'subsidy':      [ROLE.ADMIN, ROLE.EMPLOYEE],
-  'account':      [ROLE.ADMIN, ROLE.EMPLOYEE, ROLE.DEALER],
-  'deal':         [ROLE.ADMIN, ROLE.EMPLOYEE],
-  'admin':        [ROLE.ADMIN, ROLE.EMPLOYEE]
+  'catalog':      [ROLE.SUPER, ROLE.ADMIN, ROLE.EMPLOYEE, ROLE.DEALER],
+  'proposal':     [ROLE.SUPER, ROLE.ADMIN, ROLE.EMPLOYEE, ROLE.DEALER],
+  'running-cost': [ROLE.SUPER, ROLE.ADMIN, ROLE.EMPLOYEE],
+  'simulator':    [ROLE.SUPER, ROLE.ADMIN, ROLE.EMPLOYEE],
+  'estimate':     [ROLE.SUPER, ROLE.ADMIN, ROLE.EMPLOYEE],
+  'subsidy':      [ROLE.SUPER, ROLE.ADMIN, ROLE.EMPLOYEE],
+  'account':      [ROLE.SUPER, ROLE.ADMIN, ROLE.EMPLOYEE, ROLE.DEALER],
+  'deal':         [ROLE.SUPER, ROLE.ADMIN],
+  'admin':        [ROLE.SUPER, ROLE.ADMIN]
 };
 const FEATURE_ACCESS = {
-  viewUserList:   [ROLE.ADMIN, ROLE.EMPLOYEE], // ユーザー一覧の閲覧
-  manageUsers:    [ROLE.ADMIN],                // 新規登録・ロール変更・無効化
-  manageDealers:  [ROLE.ADMIN],                // 代理店ドメイン・代理店価格設定
-  managePrices:   [ROLE.ADMIN, ROLE.EMPLOYEE], // 全体価格設定
-  manageContent:  [ROLE.ADMIN, ROLE.EMPLOYEE]  // 製品コンテンツ編集
+  viewUserList:   [ROLE.SUPER, ROLE.ADMIN], // ユーザー一覧の閲覧
+  manageUsers:    [ROLE.SUPER, ROLE.ADMIN], // 新規登録・ロール変更・無効化
+  grantAdmin:     [ROLE.SUPER],             // 管理者権限の付与・剥奪（総合管理者のみ）
+  manageDealers:  [ROLE.SUPER, ROLE.ADMIN], // 代理店ドメイン・代理店価格設定
+  managePrices:   [ROLE.SUPER, ROLE.ADMIN], // 全体価格設定
+  manageContent:  [ROLE.SUPER, ROLE.ADMIN]  // 製品コンテンツ編集
 };
 function canAccessPage(page) {
   return !!currentUserRole && (PAGE_ACCESS[page] || []).includes(currentUserRole);
@@ -80,12 +86,20 @@ auth.onAuthStateChanged(async (user) => {
 
     try {
       const userDoc = await db.collection('users').doc(user.uid).get();
+      const isSuperAdminEmail = user.email && user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
       if (userDoc.exists) {
         const data = userDoc.data();
-        if (data.disabled) {
+        if (data.disabled && !isSuperAdminEmail) {
           await auth.signOut();
           showToast('このアカウントは無効化されています。管理者にお問い合わせください。', 'warning', 6000);
           return;
+        }
+        // 総合管理者メールは自動昇格（ロールが違っていても superadmin に修正）
+        if (isSuperAdminEmail && data.role !== ROLE.SUPER) {
+          try {
+            await db.collection('users').doc(user.uid).update({ role: ROLE.SUPER, disabled: false });
+          } catch (e) { console.warn('総合管理者への自動昇格（Firestore更新）に失敗:', e.message); }
+          data.role = ROLE.SUPER;
         }
         currentUserRole = data.role;
         currentDealerConfig = data.dealerConfig || null;
@@ -95,6 +109,22 @@ auth.onAuthStateChanged(async (user) => {
         showToast(`ようこそ、${data.displayName || user.email}さん`, 'success');
       } else {
         // ユーザードキュメントがない場合
+        // 総合管理者メール → superadmin としてドキュメントを自動作成
+        if (isSuperAdminEmail) {
+          await db.collection('users').doc(user.uid).set({
+            email: user.email,
+            displayName: '総合管理者',
+            role: ROLE.SUPER,
+            company: '日工株式会社',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          currentUserRole = ROLE.SUPER;
+          hideLoginScreen();
+          applyRolePermissions();
+          await loadCloudData();
+          showToast('ようこそ、総合管理者さん', 'success');
+          return;
+        }
         // @nikko-net.co.jp → 社員としてプロフィール登録画面を表示
         if (user.email && user.email.toLowerCase().endsWith('@nikko-net.co.jp')) {
           showProfileSetup();
@@ -125,7 +155,14 @@ auth.onAuthStateChanged(async (user) => {
       }
     } catch (firestoreErr) {
       console.error('Firestore読み取りエラー:', firestoreErr);
-      if (user.email && user.email.toLowerCase().endsWith('@nikko-net.co.jp')) {
+      if (user.email && user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        // 総合管理者はFirestore障害時もsuperadminとして続行
+        currentUserRole = ROLE.SUPER;
+        hideLoginScreen();
+        applyRolePermissions();
+        try { await loadCloudData(); } catch(loadErr) { console.warn('loadCloudDataフォールバック:', loadErr); }
+        showToast('ようこそ、総合管理者さん（オフラインモード）', 'success');
+      } else if (user.email && user.email.toLowerCase().endsWith('@nikko-net.co.jp')) {
         // localStorageにプロフィールがあればそれを使って直接ログイン
         let savedProfile = null;
         try { savedProfile = JSON.parse(localStorage.getItem('nikko_user_profile')); } catch(e) {}
@@ -347,9 +384,9 @@ function applyRolePermissions() {
   document.querySelectorAll('.admin-only').forEach(el => {
     el.style.display = canAccessPage('admin') ? '' : 'none';
   });
-  // 社員以上
+  // 社員以上（代理店以外）
   document.querySelectorAll('.employee-only').forEach(el => {
-    el.style.display = (currentUserRole === ROLE.ADMIN || currentUserRole === ROLE.EMPLOYEE) ? '' : 'none';
+    el.style.display = [ROLE.SUPER, ROLE.ADMIN, ROLE.EMPLOYEE].includes(currentUserRole) ? '' : 'none';
   });
   // 機能単位の表示制御（FEATURE_ACCESS に従う）
   document.querySelectorAll('[data-feature]').forEach(el => {
@@ -495,10 +532,13 @@ function renderUserList() {
   container.innerHTML = users.map(u => {
     const created = u.createdAt?.seconds ? new Date(u.createdAt.seconds * 1000).toLocaleDateString('ja-JP') : '—';
     const isSelf = currentUser && u.id === currentUser.uid;
+    const isSuperTarget = u.role === ROLE.SUPER;
+    // 管理者ロールの変更・無効化は総合管理者のみ（付与・剥奪の権限）
+    const canEditTarget = !isSelf && !isSuperTarget && (u.role !== ROLE.ADMIN || can('grantAdmin'));
     return `<div class="admin-user-row" style="${u.disabled ? 'opacity:0.5;background:var(--gray-50);' : ''}">
       <div class="admin-user-info">
         <strong>${sanitize(u.displayName || '—')}</strong>
-        <span class="admin-user-role ${u.role}">${ROLE_LABELS[u.role] || sanitize(u.role || '未設定')}</span>
+        <span class="admin-user-role ${sanitize(u.role || '')}">${ROLE_LABELS[u.role] || sanitize(u.role || '未設定')}</span>
         ${isSelf ? '<span style="font-size:0.68rem;padding:2px 8px;background:var(--blue-100);color:var(--blue-800);border-radius:4px;font-weight:600;">自分</span>' : ''}
         ${u.disabled ? '<span style="font-size:0.68rem;padding:2px 8px;background:#fee2e2;color:#b91c1c;border-radius:4px;font-weight:600;">無効</span>' : ''}
         ${u.company ? `<span class="admin-user-company">${sanitize(u.company)}</span>` : ''}
@@ -507,8 +547,8 @@ function renderUserList() {
       <div class="admin-user-email">${sanitize(u.email || '')}<span style="margin-left:10px;color:var(--gray-400);font-size:0.72rem;">登録: ${created}</span></div>
       ${isManager ? `<div class="admin-user-actions">
         ${u.role === 'dealer' ? `<button onclick="openDealerPricing('${u.id}')" class="btn-sm">価格設定</button>` : ''}
-        ${!isSelf ? `<button onclick="adminChangeRole('${u.id}', '${u.role}')" class="btn-sm">ロール変更</button>` : ''}
-        ${!isSelf ? `<button onclick="adminToggleDisabled('${u.id}', ${!!u.disabled})" class="btn-sm" style="${u.disabled ? 'color:var(--success);' : 'color:#b91c1c;'}">${u.disabled ? '有効化' : '無効化'}</button>` : ''}
+        ${canEditTarget ? `<button onclick="adminChangeRole('${u.id}', '${u.role}')" class="btn-sm">ロール変更</button>` : ''}
+        ${canEditTarget ? `<button onclick="adminToggleDisabled('${u.id}', ${!!u.disabled})" class="btn-sm" style="${u.disabled ? 'color:var(--success);' : 'color:#b91c1c;'}">${u.disabled ? '有効化' : '無効化'}</button>` : ''}
       </div>` : ''}
     </div>`;
   }).join('');
@@ -519,6 +559,8 @@ async function adminToggleDisabled(userId, currentlyDisabled) {
   if (!can('manageUsers')) { showToast('この操作は管理者のみ実行できます', 'warning'); return; }
   if (currentUser && userId === currentUser.uid) { showToast('自分自身のアカウントは無効化できません', 'warning'); return; }
   const target = adminUsersCache.find(u => u.id === userId);
+  if (target && target.role === ROLE.SUPER) { showToast('総合管理者のアカウントは無効化できません', 'warning'); return; }
+  if (target && target.role === ROLE.ADMIN && !can('grantAdmin')) { showToast('管理者アカウントの無効化は総合管理者のみ実行できます', 'warning'); return; }
   const label = target ? (target.displayName || target.email) : 'このユーザー';
   const action = currentlyDisabled ? '有効化' : '無効化';
   if (!confirm(`${label}さんのアカウントを${action}しますか？${currentlyDisabled ? '' : '\n※ 無効化するとログインできなくなります。'}`)) return;
@@ -533,6 +575,59 @@ async function adminToggleDisabled(userId, currentlyDisabled) {
   } catch (err) {
     showToast(`${action}に失敗しました: ` + err.message, 'warning');
   }
+}
+
+// ===== 代理店管理タブ：代理店ユーザー一覧 =====
+async function loadDealerUsers() {
+  if (!can('viewUserList')) return;
+  const container = document.getElementById('dealer-user-list');
+  if (!container) return;
+  try {
+    // ユーザー管理タブと共通のキャッシュを利用（未取得なら取得）
+    if (adminUsersCache.length === 0) {
+      const snap = await db.collection('users').get();
+      adminUsersCache = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      adminUsersCache.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    }
+    renderDealerUsers();
+  } catch (err) {
+    container.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--gray-400);font-size:0.85rem;">代理店ユーザーを取得できませんでした（${sanitize(err.message)}）</div>`;
+  }
+}
+
+function renderDealerUsers() {
+  const container = document.getElementById('dealer-user-list');
+  if (!container) return;
+  const dealers = adminUsersCache.filter(u => u.role === ROLE.DEALER);
+
+  const countEl = document.getElementById('dealer-user-count');
+  if (countEl) countEl.textContent = `${dealers.length}社`;
+
+  if (dealers.length === 0) {
+    container.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--gray-400);font-size:0.85rem;">代理店ユーザーはまだ登録されていません</div>';
+    return;
+  }
+
+  const isManager = can('manageDealers');
+  container.innerHTML = dealers.map(u => {
+    const config = u.dealerConfig || {};
+    const multiplier = config.priceMultiplier ?? 1.0;
+    const customCount = Object.keys(config.customPrices || {}).length;
+    const created = u.createdAt?.seconds ? new Date(u.createdAt.seconds * 1000).toLocaleDateString('ja-JP') : '—';
+    return `<div class="admin-user-row" style="${u.disabled ? 'opacity:0.5;background:var(--gray-50);' : ''}">
+      <div class="admin-user-info">
+        <strong>${sanitize(u.company || u.displayName || '—')}</strong>
+        ${u.company && u.displayName && u.company !== u.displayName ? `<span class="admin-user-company">${sanitize(u.displayName)}</span>` : ''}
+        ${u.disabled ? '<span style="font-size:0.68rem;padding:2px 8px;background:#fee2e2;color:#b91c1c;border-radius:4px;font-weight:600;">無効</span>' : ''}
+        <span style="font-size:0.72rem;padding:2px 8px;background:var(--blue-50);color:var(--blue-800);border-radius:4px;font-weight:600;">掛率 ${multiplier}</span>
+        ${customCount > 0 ? `<span style="font-size:0.72rem;padding:2px 8px;background:var(--accent-light);color:#92400e;border-radius:4px;font-weight:600;">個別価格 ${customCount}件</span>` : ''}
+      </div>
+      <div class="admin-user-email">${sanitize(u.email || '')}<span style="margin-left:10px;color:var(--gray-400);font-size:0.72rem;">登録: ${created}</span></div>
+      ${isManager ? `<div class="admin-user-actions">
+        <button onclick="openDealerPricing('${u.id}')" class="btn-sm">価格設定</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
 }
 
 // ===== 管理者：代理店価格設定 =====
@@ -591,6 +686,9 @@ async function saveDealerPricing(userId) {
     });
     showToast('代理店価格設定を保存しました', 'success');
     closeModal();
+    // キャッシュを更新して一覧に反映
+    adminUsersCache = [];
+    loadDealerUsers();
   } catch (err) {
     showToast('保存に失敗しました: ' + err.message, 'warning');
   }
@@ -600,19 +698,25 @@ async function saveDealerPricing(userId) {
 function adminChangeRole(userId, currentRole) {
   if (!can('manageUsers')) { showToast('この操作は管理者のみ実行できます', 'warning'); return; }
   if (currentUser && userId === currentUser.uid) { showToast('自分自身のロールは変更できません', 'warning'); return; }
+  if (currentRole === ROLE.SUPER) { showToast('総合管理者のロールは変更できません', 'warning'); return; }
+  if (currentRole === ROLE.ADMIN && !can('grantAdmin')) { showToast('管理者権限の剥奪は総合管理者のみ実行できます', 'warning'); return; }
   const target = adminUsersCache.find(u => u.id === userId);
   const label = target ? sanitize(target.displayName || target.email || '') : '';
 
   const roleDescriptions = {
-    admin: '全機能 + ユーザー管理・代理店管理・価格/コンテンツ編集',
-    employee: '全営業機能 + 管理画面（価格・コンテンツ編集）',
+    admin: '全機能 + 管理画面（ユーザー管理・代理店管理・価格/コンテンツ編集）',
+    employee: '営業機能（カタログ・提案・見積・RC試算・フロー・補助金）のみ。管理画面は不可',
     dealer: '製品カタログ・機種提案のみ（代理店掛率で価格表示）'
   };
+  // 割り当て可能なロール。管理者権限の付与は総合管理者のみ。総合管理者ロールは固定のため割り当て不可
+  const assignableRoles = [];
+  if (can('grantAdmin')) assignableRoles.push(ROLE.ADMIN);
+  assignableRoles.push(ROLE.EMPLOYEE, ROLE.DEALER);
   const html = `
     <h3 style="margin-bottom:0.4rem;color:var(--blue-900);">ロール変更</h3>
     <p style="font-size:0.85rem;color:var(--gray-500);margin-bottom:1rem;">${label}さんの権限を選択してください。</p>
     <div style="display:grid;gap:8px;margin-bottom:1.2rem;">
-      ${Object.values(ROLE).map(r => `
+      ${assignableRoles.map(r => `
         <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:2px solid ${r === currentRole ? 'var(--blue-400)' : 'var(--gray-200)'};border-radius:10px;cursor:pointer;background:${r === currentRole ? 'var(--blue-50)' : 'var(--white)'};">
           <input type="radio" name="role-select" value="${r}" ${r === currentRole ? 'checked' : ''} style="margin-top:3px;">
           <span>
@@ -622,6 +726,7 @@ function adminChangeRole(userId, currentRole) {
           </span>
         </label>`).join('')}
     </div>
+    ${!can('grantAdmin') ? '<p style="font-size:0.72rem;color:var(--gray-400);margin:-0.6rem 0 1rem;">※ 管理者権限の付与・剥奪は総合管理者のみ実行できます。</p>' : ''}
     <div style="display:flex;gap:8px;justify-content:flex-end;">
       <button onclick="closeModal()" style="padding:10px 20px;background:var(--gray-200);border:none;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;">キャンセル</button>
       <button onclick="confirmRoleChange('${userId}', '${currentRole}')" style="padding:10px 20px;background:var(--blue-600);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;">変更する</button>
@@ -638,6 +743,11 @@ async function confirmRoleChange(userId, currentRole) {
   const selected = document.querySelector('input[name="role-select"]:checked');
   if (!selected || selected.value === currentRole) { closeModal(); return; }
   const newRole = selected.value;
+  if (newRole === ROLE.SUPER) { showToast('総合管理者ロールは割り当てできません', 'warning'); return; }
+  if ((newRole === ROLE.ADMIN || currentRole === ROLE.ADMIN) && !can('grantAdmin')) {
+    showToast('管理者権限の付与・剥奪は総合管理者のみ実行できます', 'warning');
+    return;
+  }
   try {
     const update = {
       role: newRole,
@@ -732,6 +842,14 @@ async function adminRegisterUser() {
   }
   if (tempPw.length < 8) {
     showToast('パスワードは8文字以上にしてください', 'warning');
+    return;
+  }
+  if (role === ROLE.ADMIN && !can('grantAdmin')) {
+    showToast('管理者アカウントの作成は総合管理者のみ実行できます', 'warning');
+    return;
+  }
+  if (role === ROLE.SUPER) {
+    showToast('総合管理者アカウントは作成できません', 'warning');
     return;
   }
 
@@ -2241,6 +2359,7 @@ body {
 .admin-user-info { flex:1;min-width:200px; }
 .admin-user-info strong { font-size:0.9rem;color:var(--blue-900); }
 .admin-user-role { font-size:0.7rem;padding:2px 8px;border-radius:12px;margin-left:8px;font-weight:600; }
+.admin-user-role.superadmin { background:#fee2e2;color:#991b1b; }
 .admin-user-role.admin { background:#fef3c7;color:#92400e; }
 .admin-user-role.employee { background:#d1fae5;color:#065f46; }
 .admin-user-role.dealer { background:#e0e7ff;color:#3730a3; }
@@ -3811,15 +3930,16 @@ body {
       <!-- タブ切替 -->
       <div style="display:flex;gap:4px;margin-bottom:1.5rem;border-bottom:2px solid var(--gray-200);padding-bottom:0;">
         <button class="admin-tab active" onclick="showAdminTab('users')" data-admin-tab="users" style="padding:10px 20px;background:none;border:none;border-bottom:3px solid var(--blue-600);font-weight:700;color:var(--blue-900);cursor:pointer;font-family:inherit;font-size:0.9rem;">ユーザー管理</button>
+        <button class="admin-tab" onclick="showAdminTab('dealers')" data-admin-tab="dealers" style="padding:10px 20px;background:none;border:none;border-bottom:3px solid transparent;font-weight:600;color:var(--gray-500);cursor:pointer;font-family:inherit;font-size:0.9rem;">代理店管理</button>
         <button class="admin-tab" onclick="showAdminTab('prices')" data-admin-tab="prices" style="padding:10px 20px;background:none;border:none;border-bottom:3px solid transparent;font-weight:600;color:var(--gray-500);cursor:pointer;font-family:inherit;font-size:0.9rem;">価格設定</button>
         <button class="admin-tab" onclick="showAdminTab('content')" data-admin-tab="content" style="padding:10px 20px;background:none;border:none;border-bottom:3px solid transparent;font-weight:600;color:var(--gray-500);cursor:pointer;font-family:inherit;font-size:0.9rem;">コンテンツ管理</button>
       </div>
 
       <!-- ユーザー管理タブ -->
       <div id="admin-panel-users" class="admin-panel">
-        <!-- 権限に関する注記（社員向け・JSで表示制御） -->
+        <!-- 権限に関する注記（総合管理者以外に表示・JSで表示制御） -->
         <div id="admin-users-readonly-note" style="display:none;margin-bottom:1rem;padding:10px 14px;background:var(--accent-light);border-radius:8px;font-size:0.8rem;color:#92400e;">
-          ユーザーの新規登録・ロール変更・無効化・代理店管理は管理者のみ実行できます（一覧は閲覧のみ）。
+          管理者権限の付与・剥奪（管理者アカウントの作成・ロール変更・無効化）は総合管理者のみ実行できます。
         </div>
 
         <!-- 新規ユーザー登録（管理者のみ） -->
@@ -3838,9 +3958,9 @@ body {
             <div>
               <label style="font-size:0.75rem;font-weight:600;color:var(--gray-600);display:block;margin-bottom:4px;">ロール <span style="color:#b91c1c;">*</span></label>
               <select id="admin-new-role" style="width:100%;padding:10px 12px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);font-size:0.88rem;font-family:inherit;background:var(--white);">
-                <option value="employee">日工社員</option>
+                <option value="employee">日工社員（一般）</option>
                 <option value="dealer">販売代理店</option>
-                <option value="admin">管理者</option>
+                <option value="admin" id="admin-new-role-admin-option">日工社員（管理者）</option>
               </select>
             </div>
             <div>
@@ -3855,6 +3975,26 @@ body {
           <button id="admin-register-btn" onclick="adminRegisterUser()" style="padding:10px 24px;background:var(--success);color:var(--white);border:none;border-radius:var(--radius-sm);font-weight:700;cursor:pointer;font-family:inherit;font-size:0.88rem;">アカウントを作成</button>
         </div>
 
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:0.8rem;">
+          <h3 style="font-size:1.1rem;color:var(--blue-800);margin:0;">登録ユーザー一覧</h3>
+          <span id="admin-user-count" style="font-size:0.78rem;color:var(--gray-500);"></span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:0.8rem;">
+          <input type="text" id="admin-user-search" placeholder="🔍 氏名・メール・会社名で検索" oninput="renderUserList()" style="flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--gray-300);border-radius:8px;font-size:0.85rem;font-family:inherit;">
+          <div style="display:flex;gap:4px;">
+            <button data-user-filter="all" onclick="setUserRoleFilter('all')" style="padding:8px 14px;background:var(--blue-600);color:var(--white);border:1px solid var(--gray-200);border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;">全て</button>
+            <button data-user-filter="admin" onclick="setUserRoleFilter('admin')" style="padding:8px 14px;background:var(--white);color:var(--gray-600);border:1px solid var(--gray-200);border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;">管理者</button>
+            <button data-user-filter="employee" onclick="setUserRoleFilter('employee')" style="padding:8px 14px;background:var(--white);color:var(--gray-600);border:1px solid var(--gray-200);border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;">一般社員</button>
+            <button data-user-filter="dealer" onclick="setUserRoleFilter('dealer')" style="padding:8px 14px;background:var(--white);color:var(--gray-600);border:1px solid var(--gray-200);border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;">代理店</button>
+          </div>
+        </div>
+        <div id="admin-user-list" style="border:1px solid var(--gray-200);border-radius:12px;overflow:hidden;">
+          <div style="padding:2rem;text-align:center;color:var(--gray-400);">読み込み中...</div>
+        </div>
+      </div>
+
+      <!-- 代理店管理タブ -->
+      <div id="admin-panel-dealers" class="admin-panel" style="display:none;">
         <!-- 代理店ドメイン登録（管理者のみ） -->
         <div data-feature="manageDealers" style="background:var(--blue-50);border-radius:var(--radius);padding:1.2rem 1.5rem;margin-bottom:1.5rem;border:1px solid var(--blue-200);">
           <h4 style="margin:0 0 0.3rem;font-size:0.95rem;color:var(--blue-800);">代理店ドメイン登録</h4>
@@ -3879,19 +4019,10 @@ body {
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:0.8rem;">
-          <h3 style="font-size:1.1rem;color:var(--blue-800);margin:0;">登録ユーザー一覧</h3>
-          <span id="admin-user-count" style="font-size:0.78rem;color:var(--gray-500);"></span>
+          <h3 style="font-size:1.1rem;color:var(--blue-800);margin:0;">代理店ユーザー一覧</h3>
+          <span id="dealer-user-count" style="font-size:0.78rem;color:var(--gray-500);"></span>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:0.8rem;">
-          <input type="text" id="admin-user-search" placeholder="🔍 氏名・メール・会社名で検索" oninput="renderUserList()" style="flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--gray-300);border-radius:8px;font-size:0.85rem;font-family:inherit;">
-          <div style="display:flex;gap:4px;">
-            <button data-user-filter="all" onclick="setUserRoleFilter('all')" style="padding:8px 14px;background:var(--blue-600);color:var(--white);border:1px solid var(--gray-200);border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;">全て</button>
-            <button data-user-filter="admin" onclick="setUserRoleFilter('admin')" style="padding:8px 14px;background:var(--white);color:var(--gray-600);border:1px solid var(--gray-200);border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;">管理者</button>
-            <button data-user-filter="employee" onclick="setUserRoleFilter('employee')" style="padding:8px 14px;background:var(--white);color:var(--gray-600);border:1px solid var(--gray-200);border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;">社員</button>
-            <button data-user-filter="dealer" onclick="setUserRoleFilter('dealer')" style="padding:8px 14px;background:var(--white);color:var(--gray-600);border:1px solid var(--gray-200);border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;">代理店</button>
-          </div>
-        </div>
-        <div id="admin-user-list" style="border:1px solid var(--gray-200);border-radius:12px;overflow:hidden;">
+        <div id="dealer-user-list" style="border:1px solid var(--gray-200);border-radius:12px;overflow:hidden;">
           <div style="padding:2rem;text-align:center;color:var(--gray-400);">読み込み中...</div>
         </div>
       </div>
@@ -7203,6 +7334,7 @@ function renderAccountSummary(data) {
   if (roleEl) {
     roleEl.textContent = ROLE_LABELS[data.role] || data.role || '';
     const colors = {
+      superadmin: ['#fee2e2', '#991b1b'],
       admin: ['var(--accent-light)', '#92400e'],
       employee: ['var(--success-light)', '#065f46'],
       dealer: ['#e0e7ff', '#3730a3']
@@ -8705,11 +8837,14 @@ function showAdminTab(tab) {
   // タブ別の初期ロード
   if (tab === 'users') {
     loadUserList();
-    loadDealerDomains();
-    // 社員には閲覧専用である旨を表示
+    // 総合管理者以外には管理者権限まわりの制限を注記
     const note = document.getElementById('admin-users-readonly-note');
-    if (note) note.style.display = can('manageUsers') ? 'none' : '';
+    if (note) note.style.display = can('grantAdmin') ? 'none' : '';
+    // 「日工社員（管理者）」の新規作成は総合管理者のみ選択可能
+    const adminOpt = document.getElementById('admin-new-role-admin-option');
+    if (adminOpt) adminOpt.hidden = !can('grantAdmin');
   }
+  if (tab === 'dealers') { loadDealerDomains(); loadDealerUsers(); }
   if (tab === 'prices') renderAdminPriceList();
   if (tab === 'content') populateProductSelector();
 }
@@ -8805,9 +8940,9 @@ async function adminSaveProductContent() {
 function updateRoleBadge() {
   const badge = document.getElementById('header-role-badge');
   if (!badge) return;
-  const labels = { admin: '管理者', employee: '社員', dealer: '代理店' };
+  const labels = { superadmin: '総合管理者', admin: '管理者', employee: '社員', dealer: '代理店' };
   badge.textContent = labels[currentUserRole] || '';
-  const colors = { admin: 'rgba(245,158,11,0.3)', employee: 'rgba(16,185,129,0.3)', dealer: 'rgba(99,102,241,0.3)' };
+  const colors = { superadmin: 'rgba(220,38,38,0.35)', admin: 'rgba(245,158,11,0.3)', employee: 'rgba(16,185,129,0.3)', dealer: 'rgba(99,102,241,0.3)' };
   badge.style.background = colors[currentUserRole] || 'rgba(255,255,255,0.15)';
 }
 
