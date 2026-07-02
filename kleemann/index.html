@@ -51,7 +51,6 @@ const PAGE_ACCESS = {
   'estimate':     [ROLE.SUPER, ROLE.ADMIN, ROLE.EMPLOYEE],
   'subsidy':      [ROLE.SUPER, ROLE.ADMIN, ROLE.EMPLOYEE],
   'account':      [ROLE.SUPER, ROLE.ADMIN, ROLE.EMPLOYEE, ROLE.DEALER],
-  'deal':         [ROLE.SUPER, ROLE.ADMIN],
   'admin':        [ROLE.SUPER, ROLE.ADMIN]
 };
 const FEATURE_ACCESS = {
@@ -432,19 +431,18 @@ function applyDealerPricing(config) {
 
 // ===== ナビゲーション更新 =====
 function updateNavForRole() {
-  const nav = document.querySelector('.nav-tabs');
-  if (!nav) return;
-  // 既存の管理タブを削除
-  nav.querySelectorAll('.nav-admin-tab').forEach(el => el.remove());
-  // 管理タブ追加（PAGE_ACCESS.admin に従う）
-  if (canAccessPage('admin')) {
-    const adminTab = document.createElement('div');
-    adminTab.className = 'nav-tab nav-admin-tab';
-    adminTab.dataset.page = 'admin';
-    adminTab.innerHTML = '⚙ 管理';
-    adminTab.onclick = () => showPage('admin');
-    nav.appendChild(adminTab);
-  }
+  // デスクトップナビとモバイルナビの両方に管理タブを反映
+  document.querySelectorAll('.nav-tabs, .mobile-nav').forEach(nav => {
+    nav.querySelectorAll('.nav-admin-tab').forEach(el => el.remove());
+    if (canAccessPage('admin')) {
+      const adminTab = document.createElement('button');
+      adminTab.className = 'nav-tab nav-admin-tab';
+      adminTab.dataset.page = 'admin';
+      adminTab.innerHTML = '⚙ 管理';
+      adminTab.onclick = () => showPage('admin');
+      nav.appendChild(adminTab);
+    }
+  });
 }
 
 // ===== Firestoreからクラウドデータ読み込み =====
@@ -773,21 +771,6 @@ async function confirmRoleChange(userId, currentRole) {
     loadUserList();
   } catch (err) {
     showToast('変更に失敗しました: ' + err.message, 'warning');
-  }
-}
-
-// ===== 管理者：コンテンツ更新（価格・スペック） =====
-async function adminSavePrices() {
-  if (!can('managePrices')) { showToast('この操作の権限がありません', 'warning'); return; }
-  try {
-    await db.collection('settings').doc('products').set({
-      machinePrices: machinePrices,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedBy: currentUser.uid
-    }, { merge: true });
-    showToast('価格データをクラウドに保存しました。全ユーザーに反映されます。', 'success');
-  } catch (err) {
-    showToast('保存に失敗しました: ' + err.message, 'warning');
   }
 }
 
@@ -2260,9 +2243,7 @@ body {
 .deal-tab { padding:8px 16px;border:none;background:none;font-size:0.8rem;font-weight:600;color:#888;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s; }
 .deal-tab.active { color:var(--blue-700);border-bottom-color:var(--blue-700); }
 .deal-tab:hover { color:var(--blue-600); }
-.deal-panel { display:none;background:white;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:1.5rem; }
-.deal-panel.active { display:block; }
-.deal-panel h3 { font-size:0.95rem;color:var(--blue-700);margin:0 0 1rem; }
+.admin-panel > h3 { font-size:1.05rem;color:var(--blue-800);margin:0 0 1rem; }
 .price-table { width:100%;border-collapse:collapse;margin-bottom:1rem; }
 .price-table th { background:#f0f4fa;padding:8px 12px;font-size:0.75rem;font-weight:700;color:#0a2a5e;border:1px solid #ddd;text-align:left; }
 .price-table td { padding:6px 12px;font-size:0.82rem;border:1px solid #ddd; }
@@ -2579,9 +2560,6 @@ body {
   </nav>
   <div class="header-right">
     <span id="header-role-badge" style="font-size:0.7rem;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.8);font-weight:600;"></span>
-    <div class="deal-mode-toggle admin-only">
-      <button class="deal-mode-btn" id="deal-mode-btn" onclick="toggleDealMode()">管理</button>
-    </div>
     <button class="header-account-btn" onclick="showPage('account')" title="アカウント管理">👤</button>
     <button onclick="handleLogout()" title="ログアウト" style="background:none;border:none;color:rgba(255,255,255,0.7);cursor:pointer;font-size:1.1rem;padding:6px;">⏻</button>
   </div>
@@ -3818,127 +3796,19 @@ body {
     </div>
   </div>
 
-  <!-- 商談モード管理画面 -->
-  <div id="page-deal" class="page-view">
-    <div class="deal-page">
-      <h2>商談モード管理</h2>
-      <div class="deal-tabs">
-        <button class="deal-tab active" onclick="showDealTab('pricing')">価格設定</button>
-        <button class="deal-tab" onclick="showDealTab('catalog')">カタログ管理</button>
-        <button class="deal-tab" onclick="showDealTab('youtube')">動画管理</button>
-        <button class="deal-tab" onclick="showDealTab('data')">データ修正</button>
-      </div>
-
-      <!-- 価格設定タブ -->
-      <div class="deal-panel active" id="deal-panel-pricing">
-        <h3>製品価格設定</h3>
-        <table class="price-table">
-          <thead><tr><th>機種ID</th><th>機種名</th><th>販売価格（税別）</th><th>原価</th></tr></thead>
-          <tbody id="price-table-body"></tbody>
-        </table>
-        <button class="deal-save-btn" onclick="savePriceSettings()">価格を保存</button>
-
-        <h3 style="margin-top:1.5rem;">オプション価格設定</h3>
-        <table class="price-table">
-          <thead><tr><th>オプション名</th><th>販売価格（税別）</th><th>原価</th></tr></thead>
-          <tbody id="option-price-table-body"></tbody>
-        </table>
-        <button class="deal-save-btn" onclick="saveOptionPriceSettings()">オプション価格を保存</button>
-      </div>
-
-      <!-- カタログ管理タブ -->
-      <div class="deal-panel" id="deal-panel-catalog">
-        <h3>カタログファイル管理</h3>
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:1rem;">
-          <label style="font-size:0.8rem;font-weight:600;color:#333;white-space:nowrap;">アップ先の機種：</label>
-          <select id="catalog-target-machine" style="flex:1;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;">
-            <option value="general">共通（全体カタログ）</option>
-          </select>
-        </div>
-        <div class="catalog-upload-area" onclick="document.getElementById('catalog-file-input').click();">
-          <div style="font-size:2rem;color:#aaa;margin-bottom:6px;">📂</div>
-          <div style="font-size:0.85rem;color:#666;">クリックしてカタログPDF/画像を選択</div>
-          <input type="file" id="catalog-file-input" accept=".pdf,image/*" multiple onchange="stageCatalogFiles(event)" style="display:none;">
-        </div>
-        <div id="catalog-staged-area" style="display:none;margin-top:0.8rem;background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:0.8rem;">
-          <div style="font-size:0.78rem;font-weight:600;color:#92400e;margin-bottom:6px;">選択中のファイル：</div>
-          <div id="catalog-staged-list"></div>
-          <button class="deal-save-btn" onclick="uploadStagedCatalogFiles()" style="margin-top:0.6rem;width:100%;background:#16a34a;">保存する</button>
-          <button class="deal-save-btn" onclick="cancelStagedCatalogFiles()" style="margin-top:0.4rem;width:100%;background:#9ca3af;font-size:0.75rem;">キャンセル</button>
-        </div>
-        <div class="catalog-file-list" id="catalog-file-list"></div>
-      </div>
-
-      <!-- 動画管理タブ -->
-      <div class="deal-panel" id="deal-panel-youtube">
-        <h3>動画管理</h3>
-        <p style="font-size:0.75rem;color:#888;margin-bottom:0.8rem;">YouTube動画リンクや、通常の動画ファイルを機種ごとに管理できます。</p>
-
-        <!-- 機種選択 -->
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:1rem;">
-          <label style="font-size:0.8rem;font-weight:600;color:#333;white-space:nowrap;">対象の機種：</label>
-          <select id="video-target-machine" style="flex:1;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;">
-            <option value="general">共通（全機種共通）</option>
-          </select>
-        </div>
-
-        <!-- YouTube動画リンク -->
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem;margin-bottom:1.2rem;">
-          <h4 style="font-size:0.9rem;color:var(--blue-700);margin-bottom:0.6rem;">🎬 YouTubeリンク</h4>
-          <div id="yt-link-list"></div>
-          <div style="display:flex;gap:8px;margin-top:8px;">
-            <button class="deal-save-btn" style="background:#dc2626;" onclick="addYoutubeLink()">＋ リンクを追加</button>
-            <button class="deal-save-btn" onclick="saveYoutubeLinks()">保存</button>
-          </div>
-        </div>
-
-        <!-- 動画ファイルアップロード -->
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem;">
-          <h4 style="font-size:0.9rem;color:var(--blue-700);margin-bottom:0.6rem;">📁 動画ファイル</h4>
-          <div class="catalog-upload-area" onclick="document.getElementById('video-file-input').click();" style="margin-bottom:0.8rem;">
-            <div style="font-size:2rem;color:#aaa;margin-bottom:6px;">🎥</div>
-            <div style="font-size:0.85rem;color:#666;">クリックして動画ファイルを選択</div>
-            <div style="font-size:0.7rem;color:#aaa;margin-top:4px;">MP4, MOV, AVI, WebM に対応</div>
-            <input type="file" id="video-file-input" accept="video/*" multiple onchange="stageVideoFiles(event)" style="display:none;">
-          </div>
-          <div id="video-staged-area" style="display:none;margin-top:0.8rem;background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:0.8rem;">
-            <div style="font-size:0.78rem;font-weight:600;color:#92400e;margin-bottom:6px;">選択中のファイル：</div>
-            <div id="video-staged-list"></div>
-            <button class="deal-save-btn" onclick="uploadStagedVideoFiles()" style="margin-top:0.6rem;width:100%;background:#16a34a;">保存する</button>
-            <button class="deal-save-btn" onclick="cancelStagedVideoFiles()" style="margin-top:0.4rem;width:100%;background:#9ca3af;font-size:0.75rem;">キャンセル</button>
-          </div>
-          <div id="video-file-list"></div>
-        </div>
-      </div>
-
-      <!-- データ修正タブ -->
-      <div class="deal-panel" id="deal-panel-data">
-        <h3>データ修正</h3>
-        <p style="font-size:0.8rem;color:#666;margin-bottom:1rem;">各機種のスペックデータやカテゴリ名称を修正できます。</p>
-        <div class="account-field">
-          <label>修正対象の機種</label>
-          <select id="data-edit-machine" onchange="loadMachineDataForEdit()" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:0.85rem;">
-            <option value="">機種を選択...</option>
-          </select>
-        </div>
-        <div id="data-edit-fields" style="margin-top:1rem;"></div>
-      </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== 管理者ページ ===== -->
   <div id="page-admin" class="page-view admin-only">
     <div style="max-width:900px;margin:0 auto;padding:2rem 1rem;">
       <h2 style="color:var(--blue-900);font-size:1.5rem;margin-bottom:1.5rem;">管理者パネル</h2>
 
       <!-- タブ切替 -->
-      <div style="display:flex;gap:4px;margin-bottom:1.5rem;border-bottom:2px solid var(--gray-200);padding-bottom:0;">
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:1.5rem;border-bottom:2px solid var(--gray-200);padding-bottom:0;">
         <button class="admin-tab active" onclick="showAdminTab('users')" data-admin-tab="users" style="padding:10px 20px;background:none;border:none;border-bottom:3px solid var(--blue-600);font-weight:700;color:var(--blue-900);cursor:pointer;font-family:inherit;font-size:0.9rem;">ユーザー管理</button>
         <button class="admin-tab" onclick="showAdminTab('dealers')" data-admin-tab="dealers" style="padding:10px 20px;background:none;border:none;border-bottom:3px solid transparent;font-weight:600;color:var(--gray-500);cursor:pointer;font-family:inherit;font-size:0.9rem;">代理店管理</button>
-        <button class="admin-tab" onclick="showAdminTab('prices')" data-admin-tab="prices" style="padding:10px 20px;background:none;border:none;border-bottom:3px solid transparent;font-weight:600;color:var(--gray-500);cursor:pointer;font-family:inherit;font-size:0.9rem;">価格設定</button>
+        <button class="admin-tab" onclick="showAdminTab('pricing')" data-admin-tab="pricing" style="padding:10px 20px;background:none;border:none;border-bottom:3px solid transparent;font-weight:600;color:var(--gray-500);cursor:pointer;font-family:inherit;font-size:0.9rem;">価格・原価</button>
         <button class="admin-tab" onclick="showAdminTab('content')" data-admin-tab="content" style="padding:10px 20px;background:none;border:none;border-bottom:3px solid transparent;font-weight:600;color:var(--gray-500);cursor:pointer;font-family:inherit;font-size:0.9rem;">コンテンツ管理</button>
+        <button class="admin-tab" onclick="showAdminTab('catalog')" data-admin-tab="catalog" style="padding:10px 20px;background:none;border:none;border-bottom:3px solid transparent;font-weight:600;color:var(--gray-500);cursor:pointer;font-family:inherit;font-size:0.9rem;">カタログ管理</button>
+        <button class="admin-tab" onclick="showAdminTab('videos')" data-admin-tab="videos" style="padding:10px 20px;background:none;border:none;border-bottom:3px solid transparent;font-weight:600;color:var(--gray-500);cursor:pointer;font-family:inherit;font-size:0.9rem;">動画管理</button>
+        <button class="admin-tab" onclick="showAdminTab('data')" data-admin-tab="data" style="padding:10px 20px;background:none;border:none;border-bottom:3px solid transparent;font-weight:600;color:var(--gray-500);cursor:pointer;font-family:inherit;font-size:0.9rem;">データ修正</button>
       </div>
 
       <!-- ユーザー管理タブ -->
@@ -4034,11 +3904,100 @@ body {
       </div>
 
       <!-- 価格設定タブ -->
-      <div id="admin-panel-prices" class="admin-panel" style="display:none;">
-        <h3 style="font-size:1.1rem;color:var(--blue-800);margin-bottom:1rem;">全体価格設定</h3>
-        <p style="font-size:0.85rem;color:var(--gray-500);margin-bottom:1rem;">ここで変更した価格は、保存後に全ユーザーへ即時反映されます。代理店別の価格はユーザー管理から個別に設定できます。</p>
-        <div id="admin-price-list" style="border:1px solid var(--gray-200);border-radius:12px;overflow:hidden;"></div>
-        <button onclick="adminSavePrices()" style="margin-top:1rem;padding:12px 32px;background:var(--blue-600);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit;font-size:0.9rem;">価格をクラウドに保存</button>
+      <div class="admin-panel" id="admin-panel-pricing" style="display:none;">
+        <h3>製品価格設定</h3>
+        <table class="price-table">
+          <thead><tr><th>機種ID</th><th>機種名</th><th>販売価格（税別）</th><th>原価</th></tr></thead>
+          <tbody id="price-table-body"></tbody>
+        </table>
+        <button class="deal-save-btn" onclick="savePriceSettings()">価格を保存</button>
+
+        <h3 style="margin-top:1.5rem;">オプション価格設定</h3>
+        <table class="price-table">
+          <thead><tr><th>オプション名</th><th>販売価格（税別）</th><th>原価</th></tr></thead>
+          <tbody id="option-price-table-body"></tbody>
+        </table>
+        <button class="deal-save-btn" onclick="saveOptionPriceSettings()">オプション価格を保存</button>
+      </div>
+
+      <!-- カタログ管理タブ -->
+      <div class="admin-panel" id="admin-panel-catalog" style="display:none;">
+        <h3>カタログファイル管理</h3>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:1rem;">
+          <label style="font-size:0.8rem;font-weight:600;color:#333;white-space:nowrap;">アップ先の機種：</label>
+          <select id="catalog-target-machine" style="flex:1;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;">
+            <option value="general">共通（全体カタログ）</option>
+          </select>
+        </div>
+        <div class="catalog-upload-area" onclick="document.getElementById('catalog-file-input').click();">
+          <div style="font-size:2rem;color:#aaa;margin-bottom:6px;">📂</div>
+          <div style="font-size:0.85rem;color:#666;">クリックしてカタログPDF/画像を選択</div>
+          <input type="file" id="catalog-file-input" accept=".pdf,image/*" multiple onchange="stageCatalogFiles(event)" style="display:none;">
+        </div>
+        <div id="catalog-staged-area" style="display:none;margin-top:0.8rem;background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:0.8rem;">
+          <div style="font-size:0.78rem;font-weight:600;color:#92400e;margin-bottom:6px;">選択中のファイル：</div>
+          <div id="catalog-staged-list"></div>
+          <button class="deal-save-btn" onclick="uploadStagedCatalogFiles()" style="margin-top:0.6rem;width:100%;background:#16a34a;">保存する</button>
+          <button class="deal-save-btn" onclick="cancelStagedCatalogFiles()" style="margin-top:0.4rem;width:100%;background:#9ca3af;font-size:0.75rem;">キャンセル</button>
+        </div>
+        <div class="catalog-file-list" id="catalog-file-list"></div>
+      </div>
+
+      <!-- 動画管理タブ -->
+      <div class="admin-panel" id="admin-panel-videos" style="display:none;">
+        <h3>動画管理</h3>
+        <p style="font-size:0.75rem;color:#888;margin-bottom:0.8rem;">YouTube動画リンクや、通常の動画ファイルを機種ごとに管理できます。</p>
+
+        <!-- 機種選択 -->
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:1rem;">
+          <label style="font-size:0.8rem;font-weight:600;color:#333;white-space:nowrap;">対象の機種：</label>
+          <select id="video-target-machine" style="flex:1;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;">
+            <option value="general">共通（全機種共通）</option>
+          </select>
+        </div>
+
+        <!-- YouTube動画リンク -->
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem;margin-bottom:1.2rem;">
+          <h4 style="font-size:0.9rem;color:var(--blue-700);margin-bottom:0.6rem;">🎬 YouTubeリンク</h4>
+          <div id="yt-link-list"></div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button class="deal-save-btn" style="background:#dc2626;" onclick="addYoutubeLink()">＋ リンクを追加</button>
+            <button class="deal-save-btn" onclick="saveYoutubeLinks()">保存</button>
+          </div>
+        </div>
+
+        <!-- 動画ファイルアップロード -->
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem;">
+          <h4 style="font-size:0.9rem;color:var(--blue-700);margin-bottom:0.6rem;">📁 動画ファイル</h4>
+          <div class="catalog-upload-area" onclick="document.getElementById('video-file-input').click();" style="margin-bottom:0.8rem;">
+            <div style="font-size:2rem;color:#aaa;margin-bottom:6px;">🎥</div>
+            <div style="font-size:0.85rem;color:#666;">クリックして動画ファイルを選択</div>
+            <div style="font-size:0.7rem;color:#aaa;margin-top:4px;">MP4, MOV, AVI, WebM に対応</div>
+            <input type="file" id="video-file-input" accept="video/*" multiple onchange="stageVideoFiles(event)" style="display:none;">
+          </div>
+          <div id="video-staged-area" style="display:none;margin-top:0.8rem;background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:0.8rem;">
+            <div style="font-size:0.78rem;font-weight:600;color:#92400e;margin-bottom:6px;">選択中のファイル：</div>
+            <div id="video-staged-list"></div>
+            <button class="deal-save-btn" onclick="uploadStagedVideoFiles()" style="margin-top:0.6rem;width:100%;background:#16a34a;">保存する</button>
+            <button class="deal-save-btn" onclick="cancelStagedVideoFiles()" style="margin-top:0.4rem;width:100%;background:#9ca3af;font-size:0.75rem;">キャンセル</button>
+          </div>
+          <div id="video-file-list"></div>
+        </div>
+      </div>
+
+      <!-- データ修正タブ -->
+      <div class="admin-panel" id="admin-panel-data" style="display:none;">
+        <h3>データ修正</h3>
+        <p style="font-size:0.8rem;color:#666;margin-bottom:1rem;">各機種のスペックデータやカテゴリ名称を修正できます。</p>
+        <div class="account-field">
+          <label>修正対象の機種</label>
+          <select id="data-edit-machine" onchange="loadMachineDataForEdit()" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:0.85rem;">
+            <option value="">機種を選択...</option>
+          </select>
+        </div>
+        <div id="data-edit-fields" style="margin-top:1rem;"></div>
+      </div>
+
       </div>
 
       <!-- コンテンツ管理タブ -->
@@ -7541,14 +7500,6 @@ function acctUploadStamp(event) {
 // ===== 商談モード機能 =====
 // セキュリティ：パスワード方式を廃止し、Firestoreのadminロールで判定。
 // データ自体もFirestoreルールで保護されているため、画面を無理やり開いても原価は取得できない。
-function toggleDealMode() {
-  if (!hasAdminAccess()) {
-    showToast('商談モードは社員のみ利用できます', 'error');
-    return;
-  }
-  showPage('deal');
-  initDealPage();
-}
 
 // =====================================================================
 // マイ見積（Firestore保存・一覧・再編集・複製・ステータス管理）
@@ -7931,12 +7882,6 @@ const rcMachineTypes = {
   mss802i: { name: 'MSS 802 EVO', type: 'screen' }
 };
 
-function showDealTab(tab) {
-  document.querySelectorAll('.deal-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.deal-panel').forEach(p => p.classList.remove('active'));
-  event.target.classList.add('active');
-  document.getElementById('deal-panel-' + tab).classList.add('active');
-}
 
 function initDealPage() {
   // 製品価格テーブル
@@ -8007,6 +7952,7 @@ function initDealPage() {
 }
 
 function savePriceSettings() {
+  if (!can('managePrices')) { showToast('この操作の権限がありません', 'warning'); return; }
   Object.keys(machinePrices).forEach(id => {
     const input = document.getElementById('price-' + id);
     if (input) machinePrices[id] = parseInt(input.value) || 0;
@@ -8015,11 +7961,18 @@ function savePriceSettings() {
   });
   saveSharedData('prices', machinePrices);
   saveConfidentialData('machine_costs', machineCosts);
+  // 旧・管理者パネルの保存先(settings/products)とも同期し、ログイン時の読み込みで食い違わないようにする
+  db.collection('settings').doc('products').set({
+    machinePrices: machinePrices,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: currentUser?.uid || ''
+  }, { merge: true }).catch(e => console.warn('settings/products同期失敗:', e.message));
   showToast('製品価格・原価を保存しました（全ユーザーに反映）', 'success');
   if (typeof updateEstimateList === 'function') updateEstimateList();
 }
 
 function saveOptionPriceSettings() {
+  if (!can('managePrices')) { showToast('この操作の権限がありません', 'warning'); return; }
   Object.entries(optionParts).forEach(([cat, opts]) => {
     opts.forEach(o => {
       const input = document.getElementById('optprice-' + o.id);
@@ -8868,23 +8821,10 @@ function showAdminTab(tab) {
     if (adminOpt) adminOpt.hidden = !can('grantAdmin');
   }
   if (tab === 'dealers') { loadDealerDomains(); loadDealerUsers(); }
-  if (tab === 'prices') renderAdminPriceList();
+  if (tab === 'pricing' || tab === 'data') initDealPage();
+  if (tab === 'catalog') { initDealPage(); loadCatalogFiles(); }
+  if (tab === 'videos') { initDealPage(); loadVideoFiles(); }
   if (tab === 'content') populateProductSelector();
-}
-
-// ===== 管理者：価格一覧表示 =====
-function renderAdminPriceList() {
-  const container = document.getElementById('admin-price-list');
-  if (!container) return;
-  container.innerHTML = `<div style="display:grid;grid-template-columns:2fr 1fr;font-weight:700;padding:12px 16px;background:var(--blue-900);color:white;font-size:0.82rem;">
-    <span>機種名</span><span style="text-align:right;">価格（税別）</span>
-  </div>` +
-  products.map(p => `<div style="display:grid;grid-template-columns:2fr 1fr;padding:10px 16px;border-bottom:1px solid var(--gray-100);align-items:center;">
-    <span style="font-size:0.88rem;font-weight:600;">${p.name}</span>
-    <input type="number" data-price-id="${p.id}" value="${machinePrices[p.id] || 0}"
-      onchange="machinePrices['${p.id}']=parseInt(this.value)||0"
-      style="text-align:right;padding:8px;border:1px solid var(--gray-200);border-radius:6px;font-size:0.9rem;font-family:inherit;width:100%;">
-  </div>`).join('');
 }
 
 // ===== 管理者：製品セレクタ =====
