@@ -7167,9 +7167,9 @@ function updateEstimateList() {
 
         <!-- 見積書ボタン（機種ごと） -->
         <div class="nk-machine-actions">
-          <button class="nk-action-btn preview" onclick="openEstimatePreview(${idx})">プレビュー</button>
-          <button class="nk-action-btn print" onclick="printSingleEstimate(${idx})">見積書を印刷</button>
-          <button class="nk-action-btn preview" onclick="openSpecSheet(${idx})" style="border-color:var(--success);color:#065f46;">📋 見積仕様表</button>
+          <button class="nk-action-btn preview" onclick="openEstimatePreview(${idx})">見積書</button>
+          <button class="nk-action-btn preview" onclick="openSpecSheet(${idx})" style="border-color:var(--success);color:#065f46;">📋 仕様書</button>
+          <button class="nk-action-btn print" onclick="openQuotePackage(${idx})">🖨 見積書＋仕様書</button>
         </div>
       </div>`;
   }).join('');
@@ -7303,7 +7303,7 @@ function toggleEstSpec(idx) {
 })();
 
 // ===== 見積書プレビュー（1機種ずつ） =====
-function buildSingleEstimateHtml(idx) {
+function buildSingleEstimateHtml(idx, opts = {}) {
   const item = estimateList[idx];
   if (!item) return '';
   const p = products.find(x => x.id === item.id);
@@ -7406,7 +7406,7 @@ function buildSingleEstimateHtml(idx) {
           <div><div class="pv-eq-cat">${p?.series || ''} — ${catName}</div><div class="pv-eq-name">${p?.name || ''}</div></div>
           <div class="pv-eq-price">${fmt(machinePrices[item.id] || 0)} ×${item.qty}</div>
         </div>
-        ${specTableHtml}
+        ${opts.compact ? '' : specTableHtml}
         ${optHtml ? `<div style="border-top:1px solid #ddd;"><div style="background:#f0f4fa;padding:5px 8px;font-size:0.72rem;font-weight:700;color:#0a2a5e;border-bottom:1px solid #ddd;">オプション装置</div><div style="padding:4px 0;">${optHtml}</div></div>` : ''}
       </div>
     </div>
@@ -7606,6 +7606,26 @@ function closeSpecSheet() {
   document.getElementById('spec-preview-overlay').style.display = 'none';
   document.body.classList.remove('spec-print-mode');
   document.body.style.overflow = '';
+}
+
+// プレビューを開いてそのまま印刷ダイアログを表示
+function printSpecSheet(idx) {
+  openSpecSheet(idx);
+  setTimeout(() => window.print(), 400);
+}
+
+// ===== 見積書+仕様書の一括プレビュー・印刷 =====
+// 見積を作成したら、見積書(1ページ)と仕様書(3ページ)をセットで出力できる
+function openQuotePackage(idx) {
+  // 一括出力では見積書内の仕様テーブルを省略(仕様書側に記載されるため)
+  const est = buildSingleEstimateHtml(idx, { compact: true });
+  const spec = buildSpecSheetHtml(idx);
+  if (!est || !spec) { showToast('見積アイテムが見つかりません', 'warning'); return; }
+  document.getElementById('spec-preview-paper').innerHTML =
+    `<div class="ss-page" style="font-family:'Inter','Helvetica Neue',sans-serif;">${est}</div>` + spec;
+  document.getElementById('spec-preview-overlay').style.display = 'flex';
+  document.body.classList.add('spec-print-mode');
+  document.body.style.overflow = 'hidden';
 }
 
 function printSingleEstimate(idx) {
