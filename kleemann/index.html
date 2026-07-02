@@ -243,9 +243,11 @@ async function handleLogin(e) {
     }, 3000);
   } catch (err) {
     // @nikko-net.co.jp + 共通パスワード → 社員アカウント自動作成 → プロフィール登録へ
+    // ※総合管理者は個別パスワード運用のため共通パスワード動線の対象外
     const isNikkoDomain = email.toLowerCase().endsWith('@nikko-net.co.jp');
     const isCompanyPw = (pw === 'nikko1919');
-    if (isNikkoDomain && isCompanyPw && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
+    const isSuperEmail = email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+    if (isNikkoDomain && isCompanyPw && !isSuperEmail && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
       try {
         isInitialSetupInProgress = true;
         const cred = await auth.createUserWithEmailAndPassword(email, pw);
