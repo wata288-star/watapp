@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# マシンカルテ — 産業機械履歴管理・流通支援プラットフォーム
 
-## Getting Started
+工場で稼働する産業機械(工作機械、射出成形機、プレス機、食品機械等)1台ごとに、購入から点検・修理・部品交換までの全履歴を記録する「機械のカルテ」。蓄積された整備履歴は、中古売却時の「履歴証明書」として資産価値に転換されます。
 
-First, run the development server:
+事業計画書(株式会社FLYHEIT「マシンカルテ」)に基づくプロトタイプ実装です。
+
+## 起動方法
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run build
+npm start        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+開発時は `npm run dev`。初回アクセス時にデモデータ(2社・15機械・900件超の整備履歴)が `.data/karte.json` に自動生成されます。デモデータを初期化したい場合は `.data/` を削除してください。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## デモアカウント
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| ログインID | パスワード | 立場 |
+| --- | --- | --- |
+| `yamato-admin` | `demo` | 大和精密工業 / 製造部長(管理者) — 証明書発行・売却相談を含む全機能 |
+| `yamato-field` | `demo` | 大和精密工業 / 設備保全担当(現場) — スマホ版での記録入力 |
+| `hokuriku-admin` | `demo` | 北陸フーズ / 品質管理課長(管理者) — 食品機械・HACCP衛生記録 |
 
-## Learn More
+企業ごとにデータは厳格に分離されており、他社の機械・履歴は一切参照できません。
 
-To learn more about Next.js, take a look at the following resources:
+## 画面構成
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### WEB版コンソール `/console`(管理者・事務向け)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **ダッシュボード** — 登録機械数、今月の記録、法定点検の期限アラート、売却案件
+- **機械台帳** — 検索・絞り込み、機械登録(QRコード自動発番)、QRラベル印刷
+- **機械カルテ** — 基本情報、機械QRコード、整備履歴タイムライン、記録充実度(A/B/C等級)の算定
+- **整備記録** — 全記録の横断検索
+- **履歴証明書** — 発行(日本語2万円・英語版追加1万円、有効期限6ヶ月)、A4印刷対応の券面、日英ワンクリック切替
+- **売却・送客** — 売却相談の登録、提携業者への紹介、商談・成約管理(紹介手数料5%)
+- **設定** — 契約情報、SaaS利用料(機械1台あたり月額700円)の概算、データ取り扱いポリシー
 
-## Deploy on Vercel
+### スマホ版フィールドアプリ `/m`(現場担当者向け)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **ホーム** — 要対応の法定点検、最近の記録
+- **QRスキャン** — カメラでQRラベルを読み取り機械カルテを表示(手入力にも対応)
+- **記録する** — 「写真を撮って一言メモ」だけで完了。メモはキーワード辞書により自動で整形・分類。プレス機の定期自主検査・HACCP衛生記録のテンプレート(チェックリスト)付き
+- **機械一覧 / 履歴**
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 公開ページ
+
+- `/` — サービス紹介(事業計画の3層モデル: SaaS / 履歴証明書 / 売買マッチング)
+- `/verify` `/verify/[証明書番号]` — 履歴証明書の真贋照合(ログイン不要)
+- `/k/[コード]` — 機械QRコードの着地点(スマホ版カルテへ誘導)
+
+## 技術構成
+
+- Next.js 16 (App Router / Server Actions / Turbopack) + React 19 + Tailwind CSS v4
+- データ層はファイル永続化のインメモリストア(`lib/karte/db.ts`)。本番では Supabase 等への置き換えを想定した薄い抽象化
+- QRコード生成 `qrcode` / 読み取り `jsqr`
+- 記録充実度の等級判定ロジック: `lib/karte/grade.ts`(履歴カバレッジ・法定点検の実施間隔から算定)
+- 記録の自動分類: `lib/karte/classify.ts`(ルールベース、外部API非依存)
+
+## 旧デモ(通話アプリ)
+
+以前の WebRTC 通話デモは `/call`(ホーム)、`/chat/[name]`、`/room/[id]` に残しています。`server.js` の Socket.IO シグナリングも従来どおり動作します。

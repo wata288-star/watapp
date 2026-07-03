@@ -1,0 +1,229 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { createRecord } from "@/app/actions/karte";
+import { classifyMemo } from "@/lib/karte/classify";
+import { RECORD_TYPE_LABEL, type RecordType } from "@/lib/karte/types";
+import { IconCamera, IconX } from "./icons";
+
+const PRESS_CHECKLIST = [
+  "クラッチ及びブレーキの機能",
+  "クランクシャフト・フライホイールの異常有無",
+  "スライド機構・コンロッドのゆるみ",
+  "電気系統・非常停止装置の作動",
+  "安全装置(光線式)の機能",
+  "給油状態・油圧配管の漏れ",
+];
+
+const HACCP_CHECKLIST = [
+  "分解洗浄の実施",
+  "洗浄剤・殺菌剤の規定濃度",
+  "すすぎ・乾燥の確認",
+  "異物・残渣なし",
+  "パッキン・シール類の状態",
+];
+
+const FORKLIFT_CHECKLIST = [
+  "制動装置・走行装置の機能",
+  "油圧装置・荷役装置の機能",
+  "ヘッドガード・バックレストの状態",
+  "灯火・警報装置の作動",
+];
+
+const TYPES: (RecordType | "auto")[] = ["auto", "inspection", "repair", "parts", "legal", "hygiene", "note"];
+
+const inputClass =
+  "w-full border border-line2 bg-panel px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-navy";
+
+export function RecordForm({
+  machineId,
+  machineName,
+  legalKind,
+  from,
+}: {
+  machineId: string;
+  machineName: string;
+  legalKind: "press" | "haccp" | "forklift" | null;
+  from: "console" | "m";
+}) {
+  const [memo, setMemo] = useState("");
+  const [typeChoice, setTypeChoice] = useState<RecordType | "auto">("auto");
+  const [previews, setPreviews] = useState<{ name: string; url: string }[]>([]);
+  const [showDetail, setShowDetail] = useState(false);
+  const [pending, setPending] = useState(false);
+
+  const suggestion = useMemo(() => (memo.trim() ? classifyMemo(memo) : null), [memo]);
+  const resolvedType: RecordType = typeChoice === "auto" ? (suggestion?.type ?? "note") : typeChoice;
+
+  const checklist =
+    resolvedType === "legal" && legalKind === "press"
+      ? PRESS_CHECKLIST
+      : resolvedType === "legal" && legalKind === "forklift"
+        ? FORKLIFT_CHECKLIST
+        : resolvedType === "hygiene"
+          ? HACCP_CHECKLIST
+          : null;
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  return (
+    <form
+      action={createRecord}
+      onSubmit={() => setPending(true)}
+      className="space-y-6"
+    >
+      <input type="hidden" name="machineId" value={machineId} />
+      <input type="hidden" name="from" value={from} />
+      <input type="hidden" name="type" value={typeChoice} />
+
+      {/* 写真 */}
+      <div>
+        <p className="mk-label mb-2">現場写真</p>
+        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-line2 bg-panel2 px-4 py-8 text-center transition-colors hover:border-navy">
+          <IconCamera width={26} height={26} className="text-ink3" />
+          <span className="text-sm font-medium text-ink2">写真を撮る・選択する</span>
+          <span className="text-xs text-ink3">最大6枚 / 1枚10MBまで</span>
+          <input
+            type="file"
+            name="photos"
+            accept="image/*"
+            capture="environment"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              setPreviews(files.slice(0, 6).map((f) => ({ name: f.name, url: URL.createObjectURL(f) })));
+            }}
+          />
+        </label>
+        {previews.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {previews.map((p) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={p.url} src={p.url} alt={p.name} className="h-16 w-16 border border-line object-cover" />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 一言メモ */}
+      <div>
+        <label htmlFor="memo" className="mk-label mb-2 block">
+          一言メモ
+        </label>
+        <textarea
+          id="memo"
+          name="memo"
+          rows={3}
+          required
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+          placeholder="例: 潤滑油を補充、漏れなし。異音なし。"
+          className={inputClass}
+        />
+        {suggestion && typeChoice === "auto" && (
+          <p className="mt-2 border border-navy/20 bg-navysoft px-3.5 py-2.5 text-xs leading-5 text-navy">
+            自動分類: <span className="font-medium">{RECORD_TYPE_LABEL[suggestion.type]}</span> /
+            表題案「{suggestion.title}」として整形されます。
+            {suggestion.confidence === "low" && " 判定の確度が低いため、必要に応じて種別を選択してください。"}
+          </p>
+        )}
+      </div>
+
+      {/* 種別 */}
+      <div>
+        <p className="mk-label mb-2">記録の種別</p>
+        <div className="flex flex-wrap gap-1.5">
+          {TYPES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTypeChoice(t)}
+              className={`px-3 py-1.5 text-[13px] transition-colors ${
+                typeChoice === t
+                  ? "bg-navy font-medium text-white"
+                  : "border border-line2 bg-panel text-ink2 hover:border-navy"
+              }`}
+            >
+              {t === "auto" ? "自動判定" : RECORD_TYPE_LABEL[t]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* テンプレート チェックリスト */}
+      {checklist && (
+        <div className="border border-line bg-panel p-5">
+          <p className="text-sm font-semibold">
+            {resolvedType === "hygiene" ? "衛生管理チェック(HACCP)" : "検査項目チェック"}
+          </p>
+          <p className="mt-1 text-xs text-ink3">
+            {resolvedType === "hygiene"
+              ? "衛生管理計画に基づく確認項目です。"
+              : "法定の検査項目テンプレートです。結果を選択してください。"}
+          </p>
+          <ul className="mt-4 space-y-3">
+            {checklist.map((item) => (
+              <li key={item} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="text-ink2">{item}</span>
+                <span className="flex gap-1">
+                  {(["ok", "ng", "na"] as const).map((v) => (
+                    <label
+                      key={v}
+                      className="cursor-pointer border border-line2 px-2.5 py-1 text-xs text-ink2 transition-colors has-[:checked]:border-navy has-[:checked]:bg-navy has-[:checked]:text-white"
+                    >
+                      <input type="radio" name={`check_${item}`} value={v} defaultChecked={v === "ok"} className="sr-only" />
+                      {v === "ok" ? "良" : v === "ng" ? "否" : "対象外"}
+                    </label>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 詳細 */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowDetail((s) => !s)}
+          className="flex items-center gap-2 text-sm text-ink2 underline underline-offset-4"
+        >
+          {showDetail ? <IconX width={14} height={14} /> : null}
+          {showDetail ? "詳細項目を閉じる" : "詳細項目(表題・日付・費用・業者)を開く"}
+        </button>
+        {showDetail && (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="block sm:col-span-2">
+              <span className="mk-label mb-1.5 block">表題(空欄なら自動生成)</span>
+              <input name="title" placeholder={suggestion?.title ?? "日常点検"} className={inputClass} />
+            </label>
+            <label className="block">
+              <span className="mk-label mb-1.5 block">作業日</span>
+              <input name="workDate" type="date" defaultValue={todayStr} className={inputClass} />
+            </label>
+            <label className="block">
+              <span className="mk-label mb-1.5 block">費用(円)</span>
+              <input name="cost" inputMode="numeric" placeholder="0" className={inputClass} />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mk-label mb-1.5 block">実施業者(外部委託の場合)</span>
+              <input name="vendor" placeholder="メーカーサービス等" className={inputClass} />
+            </label>
+          </div>
+        )}
+        {!showDetail && <input type="hidden" name="workDate" value={todayStr} />}
+      </div>
+
+      <button
+        type="submit"
+        disabled={pending || !memo.trim()}
+        className="w-full bg-navy px-4 py-3.5 text-sm font-medium text-white transition-colors hover:bg-navy2 disabled:opacity-50"
+      >
+        {pending ? "保存中..." : `${machineName} に記録を保存する`}
+      </button>
+    </form>
+  );
+}

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  /* ---- 旧アプリ(通話デモ)用トークン ---- */
   --bg: #0a0a0a;
   --fg: #ffffff;
   --surface: #141414;
@@ -8,6 +9,28 @@
   --muted: #666666;
   --danger: #ef4444;
   --success: #34d399;
+
+  /* ---- マシンカルテ デザイントークン ---- */
+  --mk-paper: #f5f4f0;
+  --mk-panel: #ffffff;
+  --mk-panel-2: #faf9f6;
+  --mk-ink: #1b1d21;
+  --mk-ink-2: #4b4f57;
+  --mk-ink-3: #85888f;
+  --mk-line: #e3e0d8;
+  --mk-line-2: #cfcbc0;
+  --mk-navy: #1d3153;
+  --mk-navy-2: #294470;
+  --mk-navy-soft: #eef1f6;
+  --mk-copper: #9c5527;
+  --mk-copper-soft: #f4ebe2;
+  --mk-ok: #2f6b4f;
+  --mk-ok-soft: #e9f1ec;
+  --mk-warn: #9a6a1f;
+  --mk-warn-soft: #f7efdd;
+  --mk-danger: #a63b2e;
+  --mk-danger-soft: #f6e8e5;
+  --mk-steel: #4a6076;
 }
 
 @theme inline {
@@ -18,17 +41,62 @@
   --color-muted: var(--muted);
   --color-danger: var(--danger);
   --color-success: var(--success);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  --color-paper: var(--mk-paper);
+  --color-panel: var(--mk-panel);
+  --color-panel2: var(--mk-panel-2);
+  --color-ink: var(--mk-ink);
+  --color-ink2: var(--mk-ink-2);
+  --color-ink3: var(--mk-ink-3);
+  --color-line: var(--mk-line);
+  --color-line2: var(--mk-line-2);
+  --color-navy: var(--mk-navy);
+  --color-navy2: var(--mk-navy-2);
+  --color-navysoft: var(--mk-navy-soft);
+  --color-copper: var(--mk-copper);
+  --color-coppersoft: var(--mk-copper-soft);
+  --color-ok: var(--mk-ok);
+  --color-oksoft: var(--mk-ok-soft);
+  --color-warn: var(--mk-warn);
+  --color-warnsoft: var(--mk-warn-soft);
+  --color-alert: var(--mk-danger);
+  --color-alertsoft: var(--mk-danger-soft);
+  --color-steel: var(--mk-steel);
+
+  --font-sans: var(--font-noto-sans), "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  --font-serif: var(--font-noto-serif), "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-mono: var(--font-plex-mono), "SFMono-Regular", Consolas, monospace;
 }
 
-html, body {
+html,
+body {
   background: var(--bg);
   color: var(--fg);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-noto-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   min-height: 100dvh;
-  overflow: hidden;         /* ページ自体のスクロールを防止（各画面内でスクロール） */
-  overscroll-behavior: none; /* iOS バウンススクロール無効化 */
+  overflow: hidden; /* 旧アプリ: ページ自体のスクロールを防止 */
+  overscroll-behavior: none;
+}
+
+/* マシンカルテ配下ではページスクロールを許可し、紙色の地に切り替える */
+body:has([data-app="karte"]) {
+  overflow: auto;
+  overscroll-behavior: auto;
+  background: var(--mk-paper);
+  color: var(--mk-ink);
+}
+
+body:has([data-app="karte"]) ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+body:has([data-app="karte"]) ::-webkit-scrollbar-track {
+  background: transparent;
+}
+body:has([data-app="karte"]) ::-webkit-scrollbar-thumb {
+  background: var(--mk-line-2);
+  border-radius: 5px;
+  border: 2px solid var(--mk-paper);
 }
 
 video {
@@ -59,4 +127,39 @@ video {
   0%, 100% { transform: translateX(0); }
   10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
   20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+/* ---- マシンカルテ 共通ユーティリティ ---- */
+
+.mk-label {
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  color: var(--mk-ink-3);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.mk-rule {
+  border-top: 1px solid var(--mk-line);
+}
+
+.mk-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 証明書などの印刷用 */
+@media print {
+  body:has([data-app="karte"]) {
+    background: #ffffff;
+  }
+  .print-hidden {
+    display: none !important;
+  }
+  .print-page {
+    break-after: page;
+  }
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
 }
