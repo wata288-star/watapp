@@ -10,7 +10,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ code: s
   if (!machine) redirect("/m/scan?notfound=1");
 
   const user = await getCurrentUser();
-  const target = `/m/machines/${machine.id}`;
+  const target = `/m/machines/${machine.id}?via=qr`;
   if (!user) redirect(`/login?dest=m&next=${encodeURIComponent(target)}`);
   redirect(target);
 }

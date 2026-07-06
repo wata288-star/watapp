@@ -97,6 +97,12 @@ export interface PartReplacement {
   qty: number;
 }
 
+export interface CaptureMeta {
+  capturedAt: string; // 撮影時刻(クライアント申告) ISO datetime
+  geo?: string; // "lat,lng"
+  viaQr: boolean; // QRコード読み取りを起点とした記録か
+}
+
 export interface MaintRecord {
   id: string;
   machineId: string;
@@ -114,12 +120,15 @@ export interface MaintRecord {
   checklist?: ChecklistItem[];
   parts?: PartReplacement[];
   photoFileIds: string[];
+  capture?: CaptureMeta; // 撮影メタデータ(写真の真正性確保)
   cost?: number; // 円
   downtimeHours?: number;
   vendor?: string; // 外部業者名
   workDate: string; // 作業日 ISO date
-  createdAt: string; // ISO datetime
+  createdAt: string; // 登録日時(サーバー側で自動付与) ISO datetime
   autoClassified: boolean;
+  migrated?: boolean; // 導入時にExcel等から移行した過去記録
+  correctionOf?: string; // 訂正対象の記録ID(追記専用設計の訂正記録)
 }
 
 export interface CertSummary {
@@ -133,10 +142,21 @@ export interface CertSummary {
     legal: number;
     hygiene: number;
     total: number;
+    live: number; // サービス利用開始後にリアルタイムで蓄積された記録
+    migrated: number; // 導入時の移行データ
   };
   firstRecordAt: string | null;
   lastRecordAt: string | null;
   majorParts: PartReplacement[];
+}
+
+// AIによる異常パターン検知の結果(証明書発行時の審査)
+export interface AuditFlag {
+  code: "bulk-entry" | "pre-sale-spike" | "retroactive" | "uniform-interval";
+  label: string;
+  labelEn: string;
+  detail: string;
+  detailEn: string;
 }
 
 export interface Certificate {
@@ -160,6 +180,7 @@ export interface Certificate {
     location: string;
   };
   recordIds: string[]; // 発行時点の履歴スナップショット
+  auditFlags: AuditFlag[]; // 発行時の異常パターン検知結果(空=検出なし)
   withEnglish: boolean;
   fee: number;
   revoked: boolean;

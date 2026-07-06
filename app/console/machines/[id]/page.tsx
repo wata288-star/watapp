@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/karte/session";
 import { machineOf, recordsOfMachine, salesOf, certificatesOf } from "@/lib/karte/queries";
 import { computeGrade, nextLegalDue } from "@/lib/karte/grade";
+import { detectAnomalies } from "@/lib/karte/anomaly";
 import { fmtDate, todayIso } from "@/lib/karte/format";
 import { qrSvg, baseUrl } from "@/lib/karte/qr";
 import { PageTitle, StatusBadge, KV, SecondaryLink, PrimaryLink, GradeSeal } from "@/components/karte/ui";
@@ -20,6 +21,7 @@ export default async function MachineDetailPage({ params }: { params: Promise<{ 
 
   const records = recordsOfMachine(user.companyId, machine.id);
   const { grade, summary } = computeGrade(machine, records);
+  const auditFlags = detectAnomalies(machine, records, salesOf(user.companyId));
   const due = nextLegalDue(machine, records);
   const today = todayIso();
   const overdue = due != null && due < today;
@@ -155,6 +157,23 @@ export default async function MachineDetailPage({ params }: { params: Promise<{ 
                     </p>
                   </div>
                 </div>
+                <div className="border-t border-line pt-4">
+                  <p className="mk-label mb-2">発行前チェック(異常パターン検知)</p>
+                  {auditFlags.length === 0 ? (
+                    <p className="text-xs leading-5 text-ok">
+                      記録パターンに異常は検出されていません。
+                    </p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {auditFlags.map((f) => (
+                        <li key={f.code} className="border border-warn/30 bg-warnsoft px-3 py-2 text-xs leading-5 text-warn">
+                          <span className="font-semibold">{f.label}</span> — {f.detail}
+                          発行時に証明書へ注記されます。
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
                 <form action={issueCertificate} className="space-y-3 border-t border-line pt-4">
                   <input type="hidden" name="machineId" value={machine.id} />
                   <label className="flex items-center gap-2.5 text-sm">
@@ -232,7 +251,11 @@ export default async function MachineDetailPage({ params }: { params: Promise<{ 
               </p>
             )}
           </div>
-          <RecordTimeline records={records} initialCount={15} />
+          <RecordTimeline
+            records={records}
+            initialCount={15}
+            correctionBase={`/console/machines/${machine.id}/record`}
+          />
           {summary.majorParts.length > 0 && (
             <section className="mt-6 border border-line bg-panel">
               <h3 className="border-b border-line px-5 py-3 text-sm font-semibold">主要部品の交換歴(直近)</h3>

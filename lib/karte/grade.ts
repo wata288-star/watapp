@@ -71,6 +71,8 @@ export function computeGrade(
     legal: sorted.filter((r) => r.type === "legal").length,
     hygiene: sorted.filter((r) => r.type === "hygiene").length,
     total: sorted.length,
+    live: sorted.filter((r) => !r.migrated).length,
+    migrated: sorted.filter((r) => r.migrated).length,
   };
 
   const majorParts: PartReplacement[] = [];

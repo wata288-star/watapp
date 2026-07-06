@@ -37,14 +37,19 @@ export default async function SettingsPage() {
               <span className="ml-1 text-xs text-ink3">(売却済みを除く)</span>
             </KV>
             <KV label="単価">
-              <span className="mk-tabular">月額700円 / 台</span>
+              <span className="mk-tabular">月額800円 / 台</span>
             </KV>
             <KV label="当月概算">
               <span className="font-serif text-lg font-semibold mk-tabular">
-                ¥{(billable * 700).toLocaleString("ja-JP")}
+                ¥{(billable * 800).toLocaleString("ja-JP")}
               </span>
             </KV>
-            <KV label="導入支援">初回導入時 30万円 / 工場(精算済み)</KV>
+            <KV label="導入支援">
+              初回導入時 20万円〜 / 工場(台数により変動・精算済み)
+              <span className="mt-0.5 block text-xs text-ink3">
+                導入費を月額に分割し初期0円とする年間契約プラン(最低利用期間12ヶ月)も選択可能
+              </span>
+            </KV>
           </dl>
           <p className="border-t border-line px-6 py-4 text-xs leading-5 text-ink3">
             履歴証明書の発行料(1通2万円、英語版追加1万円)および送客手数料(成約額の5%)は、発生の都度ご請求します。
@@ -84,6 +89,10 @@ export default async function SettingsPage() {
             <li className="flex gap-3">
               <span className="mt-2 h-1 w-1 shrink-0 bg-navy" />
               機械の履歴データは企業ごとに厳格に分離され、他社から参照されることはありません。
+            </li>
+            <li className="flex gap-3">
+              <span className="mt-2 h-1 w-1 shrink-0 bg-navy" />
+              記録は追記専用で管理され、編集・削除はできません。訂正は「訂正記録」の追加により行い、登録日時はサーバー側で自動付与されます。
             </li>
             <li className="flex gap-3">
               <span className="mt-2 h-1 w-1 shrink-0 bg-navy" />

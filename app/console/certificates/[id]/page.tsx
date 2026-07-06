@@ -66,11 +66,18 @@ export default async function CertificatePage({
         verification: "4. Verification",
         verifyNote:
           "Scan the QR code or visit the URL below to verify this certificate against the records held on our server.",
+        audit: "5. Integrity Review",
+        auditClear:
+          "Records are maintained in an append-only ledger with server-side timestamps. No anomalous entry patterns were detected by the automated review at the time of issuance.",
+        auditNotes:
+          "The automated review detected the following entry patterns at the time of issuance:",
+        liveRecords: "Records accumulated in service",
+        migratedRecords: "Migrated legacy records",
         issuer: "Issuer",
         issuedAt: "Date of issue",
         expiresAt: "Valid until",
         disclaimer:
-          "This certificate attests to the completeness and authenticity of the maintenance records accumulated on the Machine Karte platform. It does not constitute any warranty of the machine's quality or performance. Quality assessment is left to the buyer and appraisers.",
+          "This certificate attests to the authenticity of the records — when, by whom, and under what circumstances each record was registered on the append-only Machine Karte ledger. The factual accuracy of record contents and the quality or performance of the machine itself are outside the scope of certification. Quality assessment is left to the buyer and appraisers. Records migrated from legacy sources at onboarding are shown separately from records accumulated in service.",
         history: "Appendix: Maintenance History",
         parts: "Appendix: Major Parts Replacements",
         date: "Date",
@@ -105,11 +112,17 @@ export default async function CertificatePage({
         verification: "4. 真贋照合",
         verifyNote:
           "QRコードの読み取り、または下記URLへのアクセスにより、本証明書の内容と当社サーバー上の記録との一致をどなたでも確認できます。",
+        audit: "5. 審査・注記",
+        auditClear:
+          "記録は追記専用(編集・削除不可)で管理され、登録日時はサーバー側で自動付与されています。発行時の自動審査において、異常な記録パターンは検出されませんでした。",
+        auditNotes: "発行時の自動審査において、以下の記録パターンが検出されています:",
+        liveRecords: "利用開始後の蓄積記録",
+        migratedRecords: "導入時の移行データ",
         issuer: "発行者",
         issuedAt: "発行日",
         expiresAt: "有効期限",
         disclaimer:
-          "本証明書は、マシンカルテに蓄積された整備記録の充実度と真正性を証明するものであり、機械の品質・性能を保証するものではありません。品質のご判断は買い手・査定業者に委ねられます。",
+          "本証明書が証明するのは「各記録がいつ・誰によって・どのような状況で登録されたか」という記録の真正性です。記録内容の事実性および機械の品質・性能そのものは証明対象外であり、品質のご判断は買い手・査定業者に委ねられます。導入時に移行された過去の記録は、利用開始後に蓄積された記録と区別して表示しています。",
         history: "別紙: 整備履歴明細",
         parts: "別紙: 主要部品の交換歴",
         date: "作業日",
@@ -227,11 +240,15 @@ export default async function CertificatePage({
               </div>
             ))}
           </div>
-          {(s.counts.legal > 0 || s.counts.hygiene > 0) && (
-            <p className="mt-2 text-xs text-ink2">
-              {t.countLegal}: {s.counts.legal} / {t.countHygiene}: {s.counts.hygiene}
-            </p>
-          )}
+          <p className="mt-2 text-xs text-ink2">
+            {(s.counts.legal > 0 || s.counts.hygiene > 0) && (
+              <>
+                {t.countLegal}: {s.counts.legal} / {t.countHygiene}: {s.counts.hygiene}
+                {" — "}
+              </>
+            )}
+            {t.liveRecords}: {s.counts.live} / {t.migratedRecords}: {s.counts.migrated}
+          </p>
         </section>
 
         {/* 4. 照合 */}
@@ -244,6 +261,28 @@ export default async function CertificatePage({
               <p className="mt-1.5 break-all font-mono text-xs">{verifyUrl}</p>
             </div>
           </div>
+        </section>
+
+        {/* 5. 審査・注記 */}
+        <section className="mt-7">
+          <h2 className="font-serif text-sm font-semibold tracking-wider text-navy">{t.audit}</h2>
+          {(cert.auditFlags ?? []).length === 0 ? (
+            <p className="mt-3 border border-line px-5 py-4 text-[13px] leading-6 text-ink2">
+              {t.auditClear}
+            </p>
+          ) : (
+            <div className="mt-3 border border-warn/40 bg-warnsoft px-5 py-4">
+              <p className="text-[13px] leading-6 text-warn">{t.auditNotes}</p>
+              <ul className="mt-2 space-y-1.5">
+                {(cert.auditFlags ?? []).map((f) => (
+                  <li key={f.code} className="text-[13px] leading-6 text-warn">
+                    <span className="font-semibold">{en ? f.labelEn : f.label}</span> —{" "}
+                    {en ? f.detailEn : f.detail}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
 
         {/* 発行者 */}
@@ -286,7 +325,12 @@ export default async function CertificatePage({
           <tbody className="divide-y divide-line">
             {records.map((r) => (
               <tr key={r.id}>
-                <td className="w-32 py-2 pr-4 align-top font-mono text-xs mk-tabular">{r.workDate}</td>
+                <td className="w-32 py-2 pr-4 align-top font-mono text-xs mk-tabular">
+                  {r.workDate}
+                  {r.migrated && (
+                    <span className="ml-1 font-sans text-[10px] text-ink3">{en ? "(migrated)" : "(移行)"}</span>
+                  )}
+                </td>
                 <td className="w-36 py-2 pr-4 align-top text-xs text-ink2">
                   {en ? RECORD_TYPE_LABEL_EN[r.type] : RECORD_TYPE_LABEL[r.type]}
                 </td>

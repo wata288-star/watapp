@@ -897,6 +897,17 @@ export function buildSeed(): Database {
     },
   ];
 
+  // カルテ登録日より前の作業日を持つ記録は、導入時にExcel・紙台帳から
+  // 移行した「移行データ」として区別する(登録日時は移行作業日で揃える)
+  const regDates = new Map(machines.map((m) => [m.id, m.registeredAt]));
+  for (const r of records) {
+    const reg = regDates.get(r.machineId);
+    if (reg && r.workDate < reg) {
+      r.migrated = true;
+      r.createdAt = `${reg}T10:00:00.000Z`;
+    }
+  }
+
   // 発行済み証明書(スナップショットは発行時点の履歴)
   const press2Records = records
     .filter((r) => r.machineId === "m_press2" && r.workDate <= "2026-05-20")
@@ -931,6 +942,8 @@ export function buildSeed(): Database {
             legal: 0,
             hygiene: 0,
             total: bandsawRecords.length,
+            live: bandsawRecords.filter((r) => !r.migrated).length,
+            migrated: bandsawRecords.filter((r) => r.migrated).length,
           },
           firstRecordAt: bandsawRecords.at(-1)?.workDate ?? null,
           lastRecordAt: bandsawRecords[0]?.workDate ?? null,
@@ -948,6 +961,7 @@ export function buildSeed(): Database {
           location: "A棟 材料切断",
         },
         recordIds: bandsawRecords.map((r) => r.id),
+        auditFlags: [],
         withEnglish: false,
         fee: 20000,
         revoked: false,
@@ -971,6 +985,8 @@ export function buildSeed(): Database {
             legal: press2Records.filter((r) => r.type === "legal").length,
             hygiene: 0,
             total: press2Records.length,
+            live: press2Records.filter((r) => !r.migrated).length,
+            migrated: press2Records.filter((r) => r.migrated).length,
           },
           firstRecordAt: press2Records.at(-1)?.workDate ?? null,
           lastRecordAt: press2Records[0]?.workDate ?? null,
@@ -988,6 +1004,7 @@ export function buildSeed(): Database {
           location: "B棟 プレスライン",
         },
         recordIds: press2Records.map((r) => r.id),
+        auditFlags: [],
         withEnglish: true,
         fee: 30000,
         revoked: false,

@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createRecord } from "@/app/actions/karte";
 import { classifyMemo } from "@/lib/karte/classify";
 import { RECORD_TYPE_LABEL, type RecordType } from "@/lib/karte/types";
-import { IconCamera, IconX } from "./icons";
+import { IconCamera, IconShield, IconX } from "./icons";
 
 const PRESS_CHECKLIST = [
   "クラッチ及びブレーキの機能",
@@ -40,17 +40,24 @@ export function RecordForm({
   machineName,
   legalKind,
   from,
+  viaQr = false,
+  correctionOf,
 }: {
   machineId: string;
   machineName: string;
   legalKind: "press" | "haccp" | "forklift" | null;
   from: "console" | "m";
+  viaQr?: boolean;
+  correctionOf?: { id: string; title: string; date: string } | null;
 }) {
   const [memo, setMemo] = useState("");
   const [typeChoice, setTypeChoice] = useState<RecordType | "auto">("auto");
-  const [previews, setPreviews] = useState<{ name: string; url: string }[]>([]);
+  const [preview, setPreview] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [pending, setPending] = useState(false);
+  const [geoState, setGeoState] = useState<"none" | "ok" | "denied">("none");
+  const capturedAtRef = useRef<HTMLInputElement>(null);
+  const geoRef = useRef<HTMLInputElement>(null);
 
   const suggestion = useMemo(() => (memo.trim() ? classifyMemo(memo) : null), [memo]);
   const resolvedType: RecordType = typeChoice === "auto" ? (suggestion?.type ?? "note") : typeChoice;
@@ -64,45 +71,67 @@ export function RecordForm({
           ? HACCP_CHECKLIST
           : null;
 
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-
   return (
-    <form
-      action={createRecord}
-      onSubmit={() => setPending(true)}
-      className="space-y-6"
-    >
+    <form action={createRecord} onSubmit={() => setPending(true)} className="space-y-6">
       <input type="hidden" name="machineId" value={machineId} />
       <input type="hidden" name="from" value={from} />
       <input type="hidden" name="type" value={typeChoice} />
+      <input type="hidden" name="viaQr" value={viaQr ? "1" : "0"} />
+      <input ref={capturedAtRef} type="hidden" name="capturedAt" />
+      <input ref={geoRef} type="hidden" name="geo" />
+      {correctionOf && <input type="hidden" name="correctionOf" value={correctionOf.id} />}
 
-      {/* 写真 */}
+      {correctionOf && (
+        <p className="border border-copper/30 bg-coppersoft px-4 py-3 text-[13px] leading-6 text-copper">
+          この記録は「{correctionOf.title}({correctionOf.date})」の訂正記録として追加されます。
+          過去の記録は書き換えられず、両方が履歴に残ります。
+        </p>
+      )}
+
+      {/* 現場写真 — アプリ内カメラ限定 */}
       <div>
-        <p className="mk-label mb-2">現場写真</p>
+        <p className="mk-label mb-2">現場写真(アプリ内カメラ)</p>
         <label className="flex cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-line2 bg-panel2 px-4 py-8 text-center transition-colors hover:border-navy">
           <IconCamera width={26} height={26} className="text-ink3" />
-          <span className="text-sm font-medium text-ink2">写真を撮る・選択する</span>
-          <span className="text-xs text-ink3">最大6枚 / 1枚10MBまで</span>
+          <span className="text-sm font-medium text-ink2">カメラで撮影する</span>
+          <span className="text-xs text-ink3">
+            ギャラリーからの選択・ファイル添付はできません(改ざん防止のため)
+          </span>
           <input
             type="file"
             name="photos"
             accept="image/*"
             capture="environment"
-            multiple
             className="hidden"
             onChange={(e) => {
-              const files = Array.from(e.target.files ?? []);
-              setPreviews(files.slice(0, 6).map((f) => ({ name: f.name, url: URL.createObjectURL(f) })));
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setPreview(URL.createObjectURL(file));
+              // 撮影メタデータをサーバーへ送る(撮影時刻・位置情報)
+              if (capturedAtRef.current) capturedAtRef.current.value = new Date().toISOString();
+              if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                  (pos) => {
+                    if (geoRef.current)
+                      geoRef.current.value = `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`;
+                    setGeoState("ok");
+                  },
+                  () => setGeoState("denied"),
+                  { timeout: 5000 },
+                );
+              }
             }}
           />
         </label>
-        {previews.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {previews.map((p) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={p.url} src={p.url} alt={p.name} className="h-16 w-16 border border-line object-cover" />
-            ))}
+        {preview && (
+          <div className="mt-3 flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview} alt="撮影した写真" className="h-16 w-16 border border-line object-cover" />
+            <p className="text-xs leading-5 text-ink2">
+              撮影時刻を記録しました。
+              {geoState === "ok" && " 位置情報も検証用に記録されます。"}
+              {geoState === "denied" && " 位置情報は許可されていないため記録されません。"}
+            </p>
           </div>
         )}
       </div>
@@ -184,6 +213,15 @@ export function RecordForm({
         </div>
       )}
 
+      {/* 追記専用の説明 */}
+      <div className="flex items-start gap-3 border border-line bg-panel2 px-4 py-3">
+        <IconShield width={17} height={17} className="mt-0.5 shrink-0 text-navy" />
+        <p className="text-xs leading-5 text-ink2">
+          作業日・登録日時はサーバー側で自動記録されます。保存した記録の編集・削除はできません。
+          誤りがあった場合は、その記録の「訂正記録を追加」から訂正してください。
+        </p>
+      </div>
+
       {/* 詳細 */}
       <div>
         <button
@@ -192,7 +230,7 @@ export function RecordForm({
           className="flex items-center gap-2 text-sm text-ink2 underline underline-offset-4"
         >
           {showDetail ? <IconX width={14} height={14} /> : null}
-          {showDetail ? "詳細項目を閉じる" : "詳細項目(表題・日付・費用・業者)を開く"}
+          {showDetail ? "詳細項目を閉じる" : "詳細項目(表題・費用・業者)を開く"}
         </button>
         {showDetail && (
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -201,20 +239,15 @@ export function RecordForm({
               <input name="title" placeholder={suggestion?.title ?? "日常点検"} className={inputClass} />
             </label>
             <label className="block">
-              <span className="mk-label mb-1.5 block">作業日</span>
-              <input name="workDate" type="date" defaultValue={todayStr} className={inputClass} />
-            </label>
-            <label className="block">
               <span className="mk-label mb-1.5 block">費用(円)</span>
               <input name="cost" inputMode="numeric" placeholder="0" className={inputClass} />
             </label>
-            <label className="block sm:col-span-2">
+            <label className="block">
               <span className="mk-label mb-1.5 block">実施業者(外部委託の場合)</span>
               <input name="vendor" placeholder="メーカーサービス等" className={inputClass} />
             </label>
           </div>
         )}
-        {!showDetail && <input type="hidden" name="workDate" value={todayStr} />}
       </div>
 
       <button

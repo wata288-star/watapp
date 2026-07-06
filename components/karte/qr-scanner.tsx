@@ -37,7 +37,7 @@ export function QrScanner({ initialMessage }: { initialMessage?: string }) {
         if (res.ok) {
           const data = (await res.json()) as { machineId: string };
           stop();
-          router.push(`/m/machines/${data.machineId}`);
+          router.push(`/m/machines/${data.machineId}?via=qr`);
           return;
         }
         setMessage(`コード「${code}」に該当する自社の機械が見つかりません。`);

@@ -103,6 +103,21 @@ export default async function VerifyResultPage({
                   </dd>
                 </div>
                 <div className="flex justify-between py-3">
+                  <dt className="text-ink3">記録の内訳</dt>
+                  <dd className="mk-tabular">
+                    蓄積記録{cert.summary.counts.live ?? cert.summary.counts.total}件 / 移行データ
+                    {cert.summary.counts.migrated ?? 0}件
+                  </dd>
+                </div>
+                <div className="flex justify-between py-3">
+                  <dt className="text-ink3">発行時の自動審査</dt>
+                  <dd className={(cert.auditFlags ?? []).length === 0 ? "text-ok" : "text-warn"}>
+                    {(cert.auditFlags ?? []).length === 0
+                      ? "異常パターンの検出なし"
+                      : `注記${(cert.auditFlags ?? []).length}件あり(券面参照)`}
+                  </dd>
+                </div>
+                <div className="flex justify-between py-3">
                   <dt className="text-ink3">発行日</dt>
                   <dd className="mk-tabular">{fmtDate(cert.issuedAt)}</dd>
                 </div>
@@ -116,7 +131,7 @@ export default async function VerifyResultPage({
                 </div>
               </dl>
               <p className="border-t border-line px-6 py-4 text-xs leading-5 text-ink3">
-                本証明書は、マシンカルテに蓄積された記録の充実度と真正性を証明するものであり、機械の品質・性能を保証するものではありません。品質のご判断は買い手・査定業者にお願いしています。
+                本証明書が証明するのは「各記録がいつ・誰によって・どのような状況で登録されたか」という記録の真正性です。記録は追記専用(編集・削除不可)で管理され、登録日時はサーバー側で自動付与されています。記録内容の事実性および機械の品質・性能は証明対象外であり、品質のご判断は買い手・査定業者にお願いしています。
               </p>
             </div>
           ) : (

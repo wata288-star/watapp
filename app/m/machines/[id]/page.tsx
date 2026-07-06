@@ -15,11 +15,11 @@ export default async function MobileMachinePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ recorded?: string }>;
+  searchParams: Promise<{ recorded?: string; via?: string }>;
 }) {
   const user = (await getCurrentUser())!;
   const { id } = await params;
-  const { recorded } = await searchParams;
+  const { recorded, via } = await searchParams;
   const machine = machineOf(user.companyId, id);
   if (!machine) notFound();
 
@@ -63,7 +63,7 @@ export default async function MobileMachinePage({
 
       {/* 記録CTA */}
       <Link
-        href={`/m/machines/${machine.id}/record`}
+        href={`/m/machines/${machine.id}/record${via === "qr" ? "?via=qr" : ""}`}
         className="mt-4 flex items-center justify-center gap-2.5 bg-navy px-4 py-4 text-sm font-medium text-white transition-colors hover:bg-navy2"
       >
         <IconPlus width={17} height={17} />
@@ -91,7 +91,12 @@ export default async function MobileMachinePage({
 
       {/* 履歴 */}
       <h2 className="mb-2.5 mt-7 mk-label">整備履歴(全{records.length}件)</h2>
-      <RecordTimeline records={records} initialCount={10} dense />
+      <RecordTimeline
+        records={records}
+        initialCount={10}
+        dense
+        correctionBase={`/m/machines/${machine.id}/record`}
+      />
 
       {/* 基本情報 */}
       <h2 className="mb-2.5 mt-7 mk-label">基本情報</h2>

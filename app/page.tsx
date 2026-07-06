@@ -34,15 +34,15 @@ const LAYERS = [
     sub: "履歴管理SaaS",
     icon: IconQr,
     body: "機械1台ごとにQRコードを貼付。スマートフォンで読み取ると、基本情報・取扱説明書・点検・修理・部品交換の全履歴が表示されます。記録は「写真を撮って一言メモ」だけで完了。入力内容は自動で整形・分類されます。",
-    price: "機械1台あたり 月額700円",
-    priceNote: "導入支援(QR貼付・既存記録のデータ移行代行)は1工場あたり30万円",
+    price: "機械1台あたり 月額800円",
+    priceNote: "導入支援(QR貼付・既存記録のデータ移行代行)は1工場あたり20万円〜(台数により変動)。導入費を月額に分割し初期0円とする年間契約プランも用意",
   },
   {
     no: "02",
     name: "履歴証明書",
     sub: "第三者管理データによる証明",
     icon: IconCert,
-    body: "売却時に、蓄積された履歴を第三者管理のデータとして証明します。記録充実度をA・B・Cの三等級で表示し、証明書のQRコードから誰でも真贋を照合可能。同一データから日本語版・英語版をワンクリックで発行できます。",
+    body: "売却時に、蓄積された履歴を第三者管理のデータとして証明します。記録充実度をA・B・Cの三等級で表示し、追記専用の改ざん不能な記録データに裏打ちされた証明として、QRコードから誰でも真贋を照合できます。同一データから日本語版・英語版をワンクリックで発行できます。",
     price: "標準(日本語) 1通 2万円",
     priceNote: "英語版は追加1万円。有効期限は発行から6ヶ月",
   },
@@ -69,6 +69,7 @@ export default function LandingPage() {
           <nav className="hidden items-center gap-7 text-sm text-ink2 md:flex">
             <a href="#service" className="hover:text-navy">サービス</a>
             <a href="#certificate" className="hover:text-navy">履歴証明書</a>
+            <a href="#integrity" className="hover:text-navy">データ真正性</a>
             <a href="#pricing" className="hover:text-navy">料金</a>
             <Link href="/verify" className="hover:text-navy">証明書照合</Link>
           </nav>
@@ -261,7 +262,7 @@ export default function LandingPage() {
                 },
                 {
                   t: "QRコードによる真贋照合",
-                  d: "証明書のQRコードを読み取ると、当社サーバー上の照合ページで証明書番号と内容の一致を誰でも確認できます。",
+                  d: "証明書のQRコードを読み取ると、当社サーバー上の照合ページで証明書番号と内容の一致を誰でも確認できます。改ざん不能な記録データに裏打ちされた証明です。",
                 },
                 {
                   t: "日英2言語対応",
@@ -269,7 +270,7 @@ export default function LandingPage() {
                 },
                 {
                   t: "品質保証ではなく、記録の証明",
-                  d: "証明対象は「記録の充実度と真正性」。品質判断は買い手・査定業者に委ねる、自動車の第三者鑑定と同様の設計です。",
+                  d: "証明対象は「各記録がいつ・誰によって・どのような状況で登録されたか」という記録の真正性。品質判断は買い手・査定業者に委ねる、自動車の第三者鑑定と同様の設計です。",
                 },
               ].map((item) => (
                 <li key={item.t} className="flex gap-4">
@@ -307,6 +308,55 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* データ真正性の担保 */}
+      <section id="integrity" className="border-b border-line bg-navy text-white">
+        <div className="mx-auto max-w-6xl px-5 py-16">
+          <p className="mk-label mb-2 !text-white/50">データ真正性の担保</p>
+          <h2 className="font-serif text-2xl font-semibold tracking-wide md:text-3xl">
+            証明書の価値は、改ざんできない記録から生まれる。
+          </h2>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-white/70">
+            履歴証明書の価値は「記録が改ざんされていない」という信頼に全面的に依存します。マシンカルテは、改ざんを「過去の記録の書き換え」と「虚偽内容の入力」の2種類に分けて捉え、多層的な対策で真正性を担保します。
+          </p>
+          <div className="mt-10 grid gap-px border border-white/15 bg-white/15 md:grid-cols-3">
+            {[
+              {
+                t: "追記専用(アペンドオンリー)設計",
+                d: "一度登録された記録の編集・削除は不可。訂正が必要な場合は「訂正記録」を新たに追加します。会計帳簿と同じ考え方で、過去の書き換えをシステム上不可能にします。",
+              },
+              {
+                t: "サーバー側タイムスタンプ",
+                d: "記録日時はユーザー入力ではなくサーバー側で自動付与。「過去の日付で点検したことにする」遡及登録は、実際の登録日時との突合で検出されます。",
+              },
+              {
+                t: "移行データの明示的な区別",
+                d: "導入時にExcel等から移行した過去の記録は「移行データ」として区別し、利用開始後にリアルタイムで蓄積された記録と混同されない形で証明書に表示します。",
+              },
+              {
+                t: "アプリ内カメラ限定の撮影",
+                d: "記録用写真は専用アプリのカメラ撮影に限定し、ギャラリー選択やファイル添付を認めません。撮影時刻・位置情報も自動記録し、「撮影という行為そのもの」を検証します。",
+              },
+              {
+                t: "QRコード起点の記録フロー",
+                d: "機械に貼付されたQRコードの読み取りを起点として撮影・記録する操作フローにより、記録者が実際にその機械の前にいたことを担保します。",
+              },
+              {
+                t: "異常パターンの自動検知",
+                d: "売却直前の記録の急増、短時間での大量一括入力、不自然な規則性などを自動検知し、証明書発行時の審査対象として券面に注記します。",
+              },
+            ].map((item) => (
+              <div key={item.t} className="bg-navy p-7">
+                <h3 className="font-serif text-base font-semibold text-white">{item.t}</h3>
+                <p className="mt-3 text-[13px] leading-6 text-white/65">{item.d}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 max-w-3xl text-xs leading-6 text-white/50">
+            証明範囲について — 当社が証明するのは「各記録がいつ・誰によって・どのような状況で登録されたか」という記録の真正性であり、記録内容の事実性および機械の品質そのものは証明対象外です。この整理は証明書券面および利用規約に明記されます。
+          </p>
+        </div>
+      </section>
+
       {/* 料金 */}
       <section id="pricing" className="border-b border-line bg-panel">
         <div className="mx-auto max-w-6xl px-5 py-16">
@@ -328,9 +378,11 @@ export default function LandingPage() {
                     機械カルテの月額利用料および導入支援(QR貼付、既存記録のデータ移行代行)
                   </td>
                   <td className="border-b border-line px-5 py-4 mk-tabular">
-                    機械1台あたり月額700円
+                    機械1台あたり月額800円
                     <br />
-                    <span className="text-xs text-ink3">導入支援は1工場あたり30万円</span>
+                    <span className="text-xs text-ink3">
+                      導入支援は1工場あたり20万円〜(台数により変動)・初期0円の月額分割プランあり
+                    </span>
                   </td>
                 </tr>
                 <tr>

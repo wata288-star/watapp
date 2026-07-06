@@ -8,6 +8,7 @@ import { getDb, saveDb, uid, machineCode, UPLOAD_DIR } from "@/lib/karte/db";
 import { createSession, destroySession, getCurrentUser } from "@/lib/karte/session";
 import { classifyMemo, suggestTitleEn } from "@/lib/karte/classify";
 import { computeGrade } from "@/lib/karte/grade";
+import { detectAnomalies } from "@/lib/karte/anomaly";
 import { addMonthsIso, todayIso } from "@/lib/karte/format";
 import type {
   ChecklistItem,
@@ -143,7 +144,26 @@ export async function createRecord(formData: FormData): Promise<void> {
     }
   }
 
+  // 訂正記録(追記専用設計): 訂正対象は自社の同一機械の記録に限る
+  const correctionOfRaw = String(formData.get("correctionOf") ?? "");
+  const correctionOf = db.records.some(
+    (r) => r.id === correctionOfRaw && r.machineId === machine.id && r.companyId === user.companyId,
+  )
+    ? correctionOfRaw
+    : undefined;
+
+  // 撮影メタデータ(写真の真正性確保)
+  const photoFileIds = await savePhotos(formData);
+  const capturedAt = String(formData.get("capturedAt") ?? "");
+  const geo = String(formData.get("geo") ?? "");
+  const viaQr = formData.get("viaQr") === "1";
+  const capture =
+    photoFileIds.length > 0 && capturedAt
+      ? { capturedAt, geo: geo || undefined, viaQr }
+      : undefined;
+
   const costRaw = String(formData.get("cost") ?? "").replace(/[,¥\s]/g, "");
+  // 記録日時はユーザー入力ではなくサーバー側で自動付与する(遡及登録の防止)
   const record: MaintRecord = {
     id: uid("r"),
     machineId: machine.id,
@@ -154,12 +174,14 @@ export async function createRecord(formData: FormData): Promise<void> {
     titleEn,
     memo,
     checklist: checklist.length > 0 ? checklist : undefined,
-    photoFileIds: await savePhotos(formData),
+    photoFileIds,
+    capture,
     cost: costRaw ? Number(costRaw) : undefined,
     vendor: String(formData.get("vendor") ?? "").trim() || undefined,
-    workDate: String(formData.get("workDate") ?? todayIso()),
+    workDate: todayIso(),
     createdAt: new Date().toISOString(),
     autoClassified: typeInput === "auto",
+    correctionOf,
   };
   db.records.push(record);
   saveDb();
@@ -187,6 +209,11 @@ export async function issueCertificate(formData: FormData): Promise<void> {
     .sort((a, b) => (a.workDate < b.workDate ? 1 : -1));
 
   const { grade, summary } = computeGrade(machine, records);
+  const auditFlags = detectAnomalies(
+    machine,
+    records,
+    db.sales.filter((s) => s.companyId === user.companyId),
+  );
   const issuedAt = todayIso();
   const seq = db.counters.cert++;
   const certNo = `MC-${issuedAt.slice(0, 4)}-${String(seq).padStart(4, "0")}`;
@@ -212,6 +239,7 @@ export async function issueCertificate(formData: FormData): Promise<void> {
       location: machine.location,
     },
     recordIds: records.map((r) => r.id),
+    auditFlags,
     withEnglish,
     fee: withEnglish ? 30000 : 20000,
     revoked: false,
