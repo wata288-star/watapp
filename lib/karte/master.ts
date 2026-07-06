@@ -166,6 +166,16 @@ export function itemsForMachine(machineType?: string): MasterItem[] {
   return [...COMMON_ITEMS, ...typed];
 }
 
+/** 定期点検モードで巡回する項目(記録タイミングに「定期」を含むもの)。査定インパクト高を先頭に */
+export function inspectionItemsFor(machineType?: string): MasterItem[] {
+  const impactOrder: Record<ItemImpact, number> = { 高: 0, 中: 1, 低: 2 };
+  return itemsForMachine(machineType)
+    .filter((i) => i.timing.includes("定期"))
+    .sort((a, b) =>
+      a.layer !== b.layer ? b.layer - a.layer : impactOrder[a.impact] - impactOrder[b.impact],
+    );
+}
+
 // ---------------- 査定準備状況の算定 ----------------
 
 export interface ItemStatus {
@@ -210,6 +220,12 @@ export function assessReadiness(
       return { item, status: ok ? "ok" : "missing", lastAt: ok ? machine.registeredAt : null };
     }
     let lastAt: string | null = null;
+    // 定期点検モードの項目別結果(項目IDで直結)を最優先で参照する
+    for (const r of records) {
+      if (r.items?.some((x) => x.itemId === item.id && x.result !== "na")) {
+        if (!lastAt || r.workDate > lastAt) lastAt = r.workDate;
+      }
+    }
     if (item.keywords) {
       for (const r of records) {
         const text = r.title + " " + r.memo;

@@ -90,6 +90,36 @@ export function RecordTimeline({
                 </dl>
               )}
 
+              {r.items && r.items.length > 0 && (
+                <ul className="mt-2.5 divide-y divide-line border border-line bg-panel2">
+                  {r.items.map((x) => (
+                    <li key={x.itemId} className="flex items-center gap-3 px-3 py-2 text-xs leading-5">
+                      {x.photoFileId ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`/api/karte/files/${x.photoFileId}`}
+                          alt={x.label}
+                          className="h-9 w-9 shrink-0 border border-line object-cover"
+                        />
+                      ) : (
+                        <span className="h-9 w-9 shrink-0 border border-dashed border-line" />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium text-ink">{x.label}</span>
+                        {x.note && <span className="block text-ink3">{x.note}</span>}
+                      </span>
+                      <span
+                        className={`shrink-0 font-semibold ${
+                          x.result === "ok" ? "text-ok" : x.result === "ng" ? "text-alert" : "text-ink3"
+                        }`}
+                      >
+                        {x.result === "ok" ? "良" : x.result === "ng" ? "否" : "対象外"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
               {r.checklist && r.checklist.length > 0 && (
                 <ul className="mt-2.5 grid gap-x-6 gap-y-1 text-xs leading-5 sm:grid-cols-2">
                   {r.checklist.map((c) => (

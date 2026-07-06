@@ -64,13 +64,22 @@ export default async function MobileMachinePage({
       </div>
 
       {/* 記録CTA */}
-      <Link
-        href={`/m/machines/${machine.id}/record${via === "qr" ? "?via=qr" : ""}`}
-        className="mt-4 flex items-center justify-center gap-2.5 bg-navy px-4 py-4 text-sm font-medium text-white transition-colors hover:bg-navy2"
-      >
-        <IconPlus width={17} height={17} />
-        写真と一言メモで記録する
-      </Link>
+      <div className="mt-4 grid gap-2">
+        <Link
+          href={`/m/machines/${machine.id}/inspect${via === "qr" ? "?via=qr" : ""}`}
+          className="flex items-center justify-center gap-2.5 bg-navy px-4 py-4 text-sm font-medium text-white transition-colors hover:bg-navy2"
+        >
+          <IconCheck width={17} height={17} />
+          定期点検を開始する(項目チェック)
+        </Link>
+        <Link
+          href={`/m/machines/${machine.id}/record${via === "qr" ? "?via=qr" : ""}`}
+          className="flex items-center justify-center gap-2.5 border border-line2 bg-panel px-4 py-3.5 text-sm font-medium text-ink transition-colors hover:border-navy hover:text-navy"
+        >
+          <IconPlus width={16} height={16} />
+          写真と一言メモで記録する(修理・気づき)
+        </Link>
+      </div>
 
       {/* 法定点検アラート */}
       {machine.legalPlan && (

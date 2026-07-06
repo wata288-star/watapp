@@ -10,8 +10,10 @@ import { classifyMemo, suggestTitleEn } from "@/lib/karte/classify";
 import { computeGrade } from "@/lib/karte/grade";
 import { detectAnomalies } from "@/lib/karte/anomaly";
 import { addMonthsIso, todayIso } from "@/lib/karte/format";
+import { COMMON_ITEMS, TYPE_ITEMS } from "@/lib/karte/master";
 import type {
   ChecklistItem,
+  InspectionItemResult,
   Machine,
   MachineCategory,
   MaintRecord,
@@ -190,6 +192,86 @@ export async function createRecord(formData: FormData): Promise<void> {
 
   const from = String(formData.get("from") ?? "console");
   redirect(from === "m" ? `/m/machines/${machine.id}?recorded=1` : `/console/machines/${machine.id}`);
+}
+
+// ---------------- 定期点検モード(項目別チェック) ----------------
+
+export async function createInspection(formData: FormData): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const machineId = String(formData.get("machineId") ?? "");
+  const db = getDb();
+  const machine = db.machines.find((m) => m.id === machineId && m.companyId === user.companyId);
+  if (!machine) throw new Error("機械が見つかりません。");
+
+  let parsed: { itemId: string; result: string; note?: string; photoFileId?: string }[];
+  try {
+    parsed = JSON.parse(String(formData.get("items") ?? "[]"));
+  } catch {
+    throw new Error("点検結果の形式が不正です。");
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) throw new Error("点検項目がありません。");
+
+  const items: InspectionItemResult[] = [];
+  for (const raw of parsed.slice(0, 40)) {
+    const result = raw.result === "ok" ? "ok" : raw.result === "ng" ? "ng" : "na";
+    let photoFileId: string | undefined;
+    if (raw.photoFileId) {
+      // 撮影即時アップロードされた自社・当該機械のファイルのみ添付を許可
+      const f = db.files.find(
+        (x) =>
+          x.id === raw.photoFileId &&
+          x.companyId === user.companyId &&
+          x.machineId === machine.id,
+      );
+      if (f) {
+        photoFileId = f.id;
+        f.attached = true;
+      }
+    }
+    items.push({
+      itemId: String(raw.itemId ?? "").slice(0, 60),
+      label: String(
+        [...COMMON_ITEMS, ...TYPE_ITEMS].find((mi) => mi.id === raw.itemId)?.label ??
+          String(raw.itemId),
+      ),
+      result,
+      note: String(raw.note ?? "").trim().slice(0, 300) || undefined,
+      photoFileId,
+    });
+  }
+
+  const ok = items.filter((i) => i.result === "ok").length;
+  const ng = items.filter((i) => i.result === "ng").length;
+  const na = items.filter((i) => i.result === "na").length;
+  const ngLabels = items.filter((i) => i.result === "ng").map((i) => i.label);
+  const photoCount = items.filter((i) => i.photoFileId).length;
+  const viaQr = formData.get("viaQr") === "1";
+
+  const record: MaintRecord = {
+    id: uid("r"),
+    machineId: machine.id,
+    companyId: user.companyId,
+    userId: user.id,
+    type: "inspection",
+    title: "定期点検(項目チェック)",
+    titleEn: "Periodic inspection (itemized checklist)",
+    memo:
+      `記録項目マスターに沿って${items.length}項目を点検。良${ok} / 否${ng} / 対象外${na}、写真${photoCount}枚。` +
+      (ngLabels.length ? ` 要対応: ${ngLabels.join("、")}。` : ""),
+    items,
+    photoFileIds: [],
+    capture:
+      photoCount > 0 ? { capturedAt: new Date().toISOString(), viaQr } : undefined,
+    workDate: todayIso(),
+    createdAt: new Date().toISOString(),
+    autoClassified: false,
+  };
+  db.records.push(record);
+  saveDb();
+  revalidatePath("/", "layout");
+  redirect(`/m/machines/${machine.id}?recorded=1`);
 }
 
 // ---------------- 履歴証明書 ----------------

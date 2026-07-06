@@ -92,6 +92,15 @@ export interface ChecklistItem {
   result: "ok" | "ng" | "na";
 }
 
+// 定期点検モード: 記録項目マスターに沿った項目別の点検結果
+export interface InspectionItemResult {
+  itemId: string; // MasterItem.id
+  label: string;
+  result: "ok" | "ng" | "na";
+  note?: string;
+  photoFileId?: string; // アプリ内カメラから撮影即時アップロードされた写真
+}
+
 export interface PartReplacement {
   name: string;
   nameEn: string;
@@ -119,6 +128,7 @@ export interface MaintRecord {
     action?: string; // 処置
   };
   checklist?: ChecklistItem[];
+  items?: InspectionItemResult[]; // 定期点検モードの項目別結果
   parts?: PartReplacement[];
   photoFileIds: string[];
   capture?: CaptureMeta; // 撮影メタデータ(写真の真正性確保)
@@ -223,7 +233,13 @@ export interface StoredFile {
   name: string;
   mime: string;
   size: number;
-  createdAt: string;
+  createdAt: string; // サーバー受信時刻(撮影即時アップロードの検証基準)
+  uploadedBy?: string; // userId
+  companyId?: string;
+  machineId?: string; // 撮影対象の機械
+  capturedAt?: string; // クライアント申告の撮影時刻
+  geo?: string;
+  attached?: boolean; // 記録に紐付け済みか(未使用ファイルの再利用防止)
 }
 
 export interface Database {

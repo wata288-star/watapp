@@ -18,10 +18,14 @@ export async function GET(
   const filePath = path.join(UPLOAD_DIR, id);
   if (!meta || !fs.existsSync(filePath)) return new Response("Not found", { status: 404 });
 
-  // 添付ファイルは記録経由でのみ参照されるため、自社の記録に紐づくものだけ配信する
-  const owned = db.records.some(
-    (r) => r.companyId === user.companyId && r.photoFileIds.includes(id),
-  );
+  // 自社がアップロードしたファイル、または自社の記録に紐づくファイルのみ配信する
+  const owned =
+    meta.companyId === user.companyId ||
+    db.records.some(
+      (r) =>
+        r.companyId === user.companyId &&
+        (r.photoFileIds.includes(id) || r.items?.some((x) => x.photoFileId === id)),
+    );
   if (!owned) return new Response("Not found", { status: 404 });
 
   const buf = fs.readFileSync(filePath);
