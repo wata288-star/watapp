@@ -1,10 +1,8 @@
 "use server";
 
-import fs from "node:fs";
-import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getDb, saveDb, uid, machineCode, UPLOAD_DIR } from "@/lib/karte/db";
+import { getDb, saveDb, uid, machineCode } from "@/lib/karte/db";
 import { createSession, destroySession, getCurrentUser } from "@/lib/karte/session";
 import { classifyMemo, suggestTitleEn } from "@/lib/karte/classify";
 import { computeGrade } from "@/lib/karte/grade";
@@ -98,28 +96,6 @@ export async function createMachine(formData: FormData): Promise<void> {
 
 // ---------------- 記録 ----------------
 
-async function savePhotos(formData: FormData): Promise<string[]> {
-  const db = getDb();
-  const ids: string[] = [];
-  const files = formData.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
-  for (const file of files.slice(0, 6)) {
-    if (file.size > 10 * 1024 * 1024) continue;
-    const id = uid("f");
-    const buf = Buffer.from(await file.arrayBuffer());
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-    fs.writeFileSync(path.join(UPLOAD_DIR, id), buf);
-    db.files.push({
-      id,
-      name: file.name,
-      mime: file.type || "application/octet-stream",
-      size: file.size,
-      createdAt: new Date().toISOString(),
-    });
-    ids.push(id);
-  }
-  return ids;
-}
-
 export async function createRecord(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -155,14 +131,31 @@ export async function createRecord(formData: FormData): Promise<void> {
     ? correctionOfRaw
     : undefined;
 
-  // 撮影メタデータ(写真の真正性確保)
-  const photoFileIds = await savePhotos(formData);
-  const capturedAt = String(formData.get("capturedAt") ?? "");
-  const geo = String(formData.get("geo") ?? "");
+  // 撮影即時アップロードされた自社・当該機械のファイルのみ添付を許可(最大6枚)
+  let requestedIds: unknown = [];
+  try {
+    requestedIds = JSON.parse(String(formData.get("photoIds") ?? "[]"));
+  } catch {
+    requestedIds = [];
+  }
+  const photoFileIds: string[] = [];
+  let firstGeo: string | undefined;
+  let firstCapturedAt: string | undefined;
+  for (const pid of (Array.isArray(requestedIds) ? requestedIds : []).slice(0, 6)) {
+    const f = db.files.find(
+      (x) => x.id === pid && x.companyId === user.companyId && x.machineId === machine.id,
+    );
+    if (f && !photoFileIds.includes(f.id)) {
+      photoFileIds.push(f.id);
+      f.attached = true;
+      if (!firstGeo) firstGeo = f.geo;
+      if (!firstCapturedAt) firstCapturedAt = f.capturedAt ?? f.createdAt;
+    }
+  }
   const viaQr = formData.get("viaQr") === "1";
   const capture =
-    photoFileIds.length > 0 && capturedAt
-      ? { capturedAt, geo: geo || undefined, viaQr }
+    photoFileIds.length > 0
+      ? { capturedAt: firstCapturedAt ?? new Date().toISOString(), geo: firstGeo, viaQr }
       : undefined;
 
   const costRaw = String(formData.get("cost") ?? "").replace(/[,¥\s]/g, "");
@@ -205,7 +198,13 @@ export async function createInspection(formData: FormData): Promise<void> {
   const machine = db.machines.find((m) => m.id === machineId && m.companyId === user.companyId);
   if (!machine) throw new Error("機械が見つかりません。");
 
-  let parsed: { itemId: string; result: string; note?: string; photoFileId?: string }[];
+  let parsed: {
+    itemId: string;
+    result: string;
+    note?: string;
+    photoFileIds?: string[];
+    photoFileId?: string;
+  }[];
   try {
     parsed = JSON.parse(String(formData.get("items") ?? "[]"));
   } catch {
@@ -216,17 +215,18 @@ export async function createInspection(formData: FormData): Promise<void> {
   const items: InspectionItemResult[] = [];
   for (const raw of parsed.slice(0, 40)) {
     const result = raw.result === "ok" ? "ok" : raw.result === "ng" ? "ng" : "na";
-    let photoFileId: string | undefined;
-    if (raw.photoFileId) {
-      // 撮影即時アップロードされた自社・当該機械のファイルのみ添付を許可
+    // 撮影即時アップロードされた自社・当該機械のファイルのみ添付を許可(項目あたり最大5枚)
+    const requested = [
+      ...(Array.isArray(raw.photoFileIds) ? raw.photoFileIds : []),
+      ...(raw.photoFileId ? [raw.photoFileId] : []),
+    ].slice(0, 5);
+    const photoFileIds: string[] = [];
+    for (const pid of requested) {
       const f = db.files.find(
-        (x) =>
-          x.id === raw.photoFileId &&
-          x.companyId === user.companyId &&
-          x.machineId === machine.id,
+        (x) => x.id === pid && x.companyId === user.companyId && x.machineId === machine.id,
       );
-      if (f) {
-        photoFileId = f.id;
+      if (f && !photoFileIds.includes(f.id)) {
+        photoFileIds.push(f.id);
         f.attached = true;
       }
     }
@@ -238,7 +238,7 @@ export async function createInspection(formData: FormData): Promise<void> {
       ),
       result,
       note: String(raw.note ?? "").trim().slice(0, 300) || undefined,
-      photoFileId,
+      photoFileIds: photoFileIds.length > 0 ? photoFileIds : undefined,
     });
   }
 
@@ -246,7 +246,7 @@ export async function createInspection(formData: FormData): Promise<void> {
   const ng = items.filter((i) => i.result === "ng").length;
   const na = items.filter((i) => i.result === "na").length;
   const ngLabels = items.filter((i) => i.result === "ng").map((i) => i.label);
-  const photoCount = items.filter((i) => i.photoFileId).length;
+  const photoCount = items.reduce((n, i) => n + (i.photoFileIds?.length ?? 0), 0);
   const viaQr = formData.get("viaQr") === "1";
 
   const record: MaintRecord = {

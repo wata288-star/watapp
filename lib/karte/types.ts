@@ -92,13 +92,14 @@ export interface ChecklistItem {
   result: "ok" | "ng" | "na";
 }
 
-// 定期点検モード: 記録項目マスターに沿った項目別の点検結果
+// 定期自主整備: 記録項目マスターに沿った項目別の点検結果
 export interface InspectionItemResult {
   itemId: string; // MasterItem.id
   label: string;
   result: "ok" | "ng" | "na";
   note?: string;
-  photoFileId?: string; // アプリ内カメラから撮影即時アップロードされた写真
+  photoFileIds?: string[]; // アプリ内カメラから撮影即時アップロードされた写真(複数可)
+  photoFileId?: string; // 旧形式(単写)の互換用
 }
 
 export interface PartReplacement {

@@ -54,12 +54,43 @@ export function RecordForm({
 }) {
   const [memo, setMemo] = useState("");
   const [typeChoice, setTypeChoice] = useState<RecordType | "auto">("auto");
-  const [preview, setPreview] = useState<string | null>(null);
+  const [photoIds, setPhotoIds] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [pending, setPending] = useState(false);
-  const [geoState, setGeoState] = useState<"none" | "ok" | "denied">("none");
-  const capturedAtRef = useRef<HTMLInputElement>(null);
-  const geoRef = useRef<HTMLInputElement>(null);
+  const geoRef = useRef<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const MAX_PHOTOS = 6;
+
+  // 撮影即時アップロード: カメラで撮った写真を編集工程を挟まずそのまま送信する
+  async function uploadCapture(file: File) {
+    setUploading(true);
+    setUploadError(null);
+    if (!geoRef.current && "geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          geoRef.current = `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`;
+        },
+        () => {},
+        { timeout: 4000 },
+      );
+    }
+    const form = new FormData();
+    form.append("photo", file);
+    form.append("machineId", machineId);
+    form.append("capturedAt", new Date().toISOString());
+    form.append("geo", geoRef.current);
+    try {
+      const res = await fetch("/api/karte/upload", { method: "POST", body: form });
+      if (!res.ok) throw new Error();
+      const data = (await res.json()) as { fileId: string };
+      setPhotoIds((ids) => [...ids, data.fileId].slice(0, MAX_PHOTOS));
+    } catch {
+      setUploadError("アップロードに失敗しました。電波状況を確認して撮り直してください。");
+    }
+    setUploading(false);
+  }
 
   const suggestion = useMemo(() => (memo.trim() ? classifyMemo(memo) : null), [memo]);
   const resolvedType: RecordType = typeChoice === "auto" ? (suggestion?.type ?? "note") : typeChoice;
@@ -79,8 +110,7 @@ export function RecordForm({
       <input type="hidden" name="from" value={from} />
       <input type="hidden" name="type" value={typeChoice} />
       <input type="hidden" name="viaQr" value={viaQr ? "1" : "0"} />
-      <input ref={capturedAtRef} type="hidden" name="capturedAt" />
-      <input ref={geoRef} type="hidden" name="geo" />
+      <input type="hidden" name="photoIds" value={JSON.stringify(photoIds)} />
       {correctionOf && <input type="hidden" name="correctionOf" value={correctionOf.id} />}
 
       {correctionOf && (
@@ -90,52 +120,73 @@ export function RecordForm({
         </p>
       )}
 
-      {/* 現場写真 — アプリ内カメラ限定 */}
+      {/* 現場写真 — アプリ内カメラ限定・撮影即時アップロード(複数可) */}
       <div>
-        <p className="mk-label mb-2">現場写真(アプリ内カメラ)</p>
-        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-line2 bg-panel2 px-4 py-8 text-center transition-colors hover:border-navy">
-          <IconCamera width={26} height={26} className="text-ink3" />
-          <span className="text-sm font-medium text-ink2">カメラで撮影する</span>
-          <span className="text-xs text-ink3">
-            ギャラリーからの選択・ファイル添付はできません(改ざん防止のため)
+        <p className="mk-label mb-2">
+          現場写真(アプリ内カメラ)
+          <span className="ml-2 font-normal normal-case tracking-normal text-ink3">
+            複数枚可(最大{MAX_PHOTOS}枚)
           </span>
-          <input
-            type="file"
-            name="photos"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              setPreview(URL.createObjectURL(file));
-              // 撮影メタデータをサーバーへ送る(撮影時刻・位置情報)
-              if (capturedAtRef.current) capturedAtRef.current.value = new Date().toISOString();
-              if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                  (pos) => {
-                    if (geoRef.current)
-                      geoRef.current.value = `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`;
-                    setGeoState("ok");
-                  },
-                  () => setGeoState("denied"),
-                  { timeout: 5000 },
-                );
-              }
-            }}
-          />
-        </label>
-        {preview && (
-          <div className="mt-3 flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview} alt="撮影した写真" className="h-16 w-16 border border-line object-cover" />
-            <p className="text-xs leading-5 text-ink2">
-              撮影時刻を記録しました。
-              {geoState === "ok" && " 位置情報も検証用に記録されます。"}
-              {geoState === "denied" && " 位置情報は許可されていないため記録されません。"}
+        </p>
+        {photoIds.length > 0 && (
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            {photoIds.map((fid, i) => (
+              <div key={fid} className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/karte/files/${fid}`}
+                  alt={`現場写真 ${i + 1}`}
+                  className="h-16 w-16 border border-ok/40 object-cover"
+                />
+                <span className="absolute bottom-0 right-0 bg-ok px-1 text-[9px] font-semibold text-white">
+                  {i + 1}
+                </span>
+              </div>
+            ))}
+            <p className="text-xs font-medium text-ok">
+              {photoIds.length}枚を撮影即時アップロード済み
             </p>
           </div>
         )}
+        {photoIds.length < MAX_PHOTOS && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className={`flex w-full flex-col items-center justify-center gap-1.5 px-4 text-center transition-colors disabled:opacity-60 ${
+              photoIds.length === 0
+                ? "border border-dashed border-line2 bg-panel2 py-7 hover:border-navy"
+                : "border border-navy/40 bg-navysoft py-3 hover:bg-navy [&:hover_*]:text-white"
+            }`}
+          >
+            <span className={`flex items-center gap-2 text-sm font-medium ${photoIds.length === 0 ? "text-ink2" : "text-navy"}`}>
+              <IconCamera width={20} height={20} className={photoIds.length === 0 ? "text-ink3" : "text-navy"} />
+              {uploading
+                ? "アップロード中..."
+                : photoIds.length === 0
+                  ? "カメラで撮影する"
+                  : "もう1枚撮影する"}
+            </span>
+            {photoIds.length === 0 && (
+              <span className="text-xs text-ink3">
+                撮影した瞬間にそのまま保存されます。ギャラリー選択・編集はできません(改ざん防止)
+              </span>
+            )}
+          </button>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void uploadCapture(file);
+            e.target.value = "";
+          }}
+        />
+        {uploadError && <p className="mt-2 text-xs text-alert">{uploadError}</p>}
       </div>
 
       {/* 記録の狙いどころ(査定準備状況で不足している項目) */}
@@ -271,7 +322,7 @@ export function RecordForm({
 
       <button
         type="submit"
-        disabled={pending || !memo.trim()}
+        disabled={pending || uploading || !memo.trim()}
         className="w-full bg-navy px-4 py-3.5 text-sm font-medium text-white transition-colors hover:bg-navy2 disabled:opacity-50"
       >
         {pending ? "保存中..." : `${machineName} に記録を保存する`}

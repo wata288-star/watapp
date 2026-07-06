@@ -24,7 +24,8 @@ export async function GET(
     db.records.some(
       (r) =>
         r.companyId === user.companyId &&
-        (r.photoFileIds.includes(id) || r.items?.some((x) => x.photoFileId === id)),
+        (r.photoFileIds.includes(id) ||
+          r.items?.some((x) => x.photoFileId === id || x.photoFileIds?.includes(id))),
     );
   if (!owned) return new Response("Not found", { status: 404 });
 

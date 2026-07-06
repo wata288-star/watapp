@@ -15,10 +15,12 @@ export interface WizardItem {
 interface ItemState {
   result?: "ok" | "ng" | "na";
   note: string;
-  photoFileId?: string;
+  photoFileIds: string[];
   uploading: boolean;
   error?: string;
 }
+
+const MAX_PHOTOS = 5;
 
 const RESULT_LABEL = { ok: "良", ng: "否", na: "対象外" } as const;
 
@@ -41,7 +43,7 @@ export function InspectionWizard({
 
   const patch = (itemId: string, p: Partial<ItemState>) =>
     setStates((s) => {
-      const prev: ItemState = s[itemId] ?? { note: "", uploading: false };
+      const prev: ItemState = s[itemId] ?? { note: "", uploading: false, photoFileIds: [] };
       return { ...s, [itemId]: { ...prev, ...p } };
     });
 
@@ -66,7 +68,17 @@ export function InspectionWizard({
       const res = await fetch("/api/karte/upload", { method: "POST", body: form });
       if (!res.ok) throw new Error();
       const data = (await res.json()) as { fileId: string };
-      patch(item.id, { uploading: false, photoFileId: data.fileId });
+      setStates((s) => {
+        const prev: ItemState = s[item.id] ?? { note: "", uploading: false, photoFileIds: [] };
+        return {
+          ...s,
+          [item.id]: {
+            ...prev,
+            uploading: false,
+            photoFileIds: [...prev.photoFileIds, data.fileId].slice(0, MAX_PHOTOS),
+          },
+        };
+      });
     } catch {
       patch(item.id, { uploading: false, error: "アップロードに失敗しました。電波状況を確認して撮り直してください。" });
     }
@@ -79,7 +91,7 @@ export function InspectionWizard({
 
   if (isSummary) {
     const ng = items.filter((it) => states[it.id]?.result === "ng");
-    const photos = items.filter((it) => states[it.id]?.photoFileId).length;
+    const photos = items.reduce((n, it) => n + (states[it.id]?.photoFileIds.length ?? 0), 0);
     return (
       <div>
         <p className="mk-label">定期自主整備 — 結果の確認</p>
@@ -108,14 +120,15 @@ export function InspectionWizard({
                 >
                   {it.label}
                 </button>
-                {s?.photoFileId && (
+                {(s?.photoFileIds ?? []).slice(0, 3).map((fid) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`/api/karte/files/${s.photoFileId}`}
+                    key={fid}
+                    src={`/api/karte/files/${fid}`}
                     alt=""
                     className="h-8 w-8 shrink-0 border border-line object-cover"
                   />
-                )}
+                ))}
                 <span
                   className={`shrink-0 font-medium ${
                     s?.result === "ok" ? "text-ok" : s?.result === "ng" ? "text-alert" : "text-ink3"
@@ -144,7 +157,7 @@ export function InspectionWizard({
                   itemId: it.id,
                   result: states[it.id].result,
                   note: states[it.id].note || undefined,
-                  photoFileId: states[it.id].photoFileId,
+                  photoFileIds: states[it.id].photoFileIds,
                 })),
             )}
           />
@@ -195,41 +208,52 @@ export function InspectionWizard({
       <h2 className="mt-2 font-serif text-xl font-semibold leading-snug">{item!.label}</h2>
       <p className="mt-2 text-[13px] leading-6 text-ink2">{item!.desc}</p>
 
-      {/* 1. 写真: カメラ起動→撮影即時アップロード(編集不可) */}
+      {/* 1. 写真: カメラ起動→撮影即時アップロード(編集不可・複数可) */}
       <div className="mt-5">
-        <p className="mk-label mb-2">1. 写真を撮る</p>
-        {st?.photoFileId ? (
-          <div className="flex items-center gap-3 border border-ok/30 bg-oksoft px-3.5 py-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/api/karte/files/${st.photoFileId}`}
-              alt="点検写真"
-              className="h-14 w-14 shrink-0 border border-line object-cover"
-            />
-            <div className="min-w-0 text-xs leading-5">
-              <p className="flex items-center gap-1.5 font-medium text-ok">
-                <IconCheck width={14} height={14} />
-                撮影即時アップロード済み
-              </p>
-              <p className="text-ink2">編集を挟まずサーバーへ保存されました。</p>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="text-ink3 underline underline-offset-4"
-              >
-                撮り直す(前の写真は破棄されず記録に残りません)
-              </button>
-            </div>
+        <p className="mk-label mb-2">
+          1. 写真を撮る
+          <span className="ml-2 font-normal normal-case tracking-normal text-ink3">
+            複数枚可(最大{MAX_PHOTOS}枚)
+          </span>
+        </p>
+        {(st?.photoFileIds.length ?? 0) > 0 && (
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            {st!.photoFileIds.map((fid, i) => (
+              <div key={fid} className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/karte/files/${fid}`}
+                  alt={`点検写真 ${i + 1}`}
+                  className="h-16 w-16 border border-ok/40 object-cover"
+                />
+                <span className="absolute bottom-0 right-0 bg-ok px-1 text-[9px] font-semibold text-white">
+                  {i + 1}
+                </span>
+              </div>
+            ))}
+            <p className="flex items-center gap-1.5 text-xs font-medium text-ok">
+              <IconCheck width={14} height={14} />
+              {st!.photoFileIds.length}枚を撮影即時アップロード済み
+            </p>
           </div>
-        ) : (
+        )}
+        {(st?.photoFileIds.length ?? 0) < MAX_PHOTOS && (
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={st?.uploading}
-            className="flex w-full items-center justify-center gap-2.5 bg-navy px-4 py-5 text-sm font-semibold text-white transition-colors hover:bg-navy2 disabled:opacity-60"
+            className={`flex w-full items-center justify-center gap-2.5 px-4 text-sm font-semibold transition-colors disabled:opacity-60 ${
+              (st?.photoFileIds.length ?? 0) === 0
+                ? "bg-navy py-5 text-white hover:bg-navy2"
+                : "border border-navy/40 bg-navysoft py-3 text-navy hover:bg-navy hover:text-white"
+            }`}
           >
-            <IconCamera width={20} height={20} />
-            {st?.uploading ? "アップロード中..." : "カメラを起動して撮影"}
+            <IconCamera width={19} height={19} />
+            {st?.uploading
+              ? "アップロード中..."
+              : (st?.photoFileIds.length ?? 0) === 0
+                ? "カメラを起動して撮影"
+                : "もう1枚撮影する"}
           </button>
         )}
         <input
@@ -245,7 +269,7 @@ export function InspectionWizard({
           }}
         />
         {st?.error && <p className="mt-2 text-xs text-alert">{st.error}</p>}
-        {!st?.photoFileId && !st?.uploading && (
+        {(st?.photoFileIds.length ?? 0) === 0 && !st?.uploading && (
           <p className="mt-1.5 text-[11px] leading-4 text-ink3">
             撮影した写真は編集の余地なくそのまま保存されます。ギャラリー選択はできません。
           </p>
