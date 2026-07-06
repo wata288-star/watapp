@@ -1,0 +1,13 @@
+{
+  "name": "マシンカルテ デモ環境",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "postCreateCommand": "npm install && npm run build",
+  "postStartCommand": "npm start",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "マシンカルテ",
+      "onAutoForward": "openBrowserOnce"
+    }
+  }
+}
