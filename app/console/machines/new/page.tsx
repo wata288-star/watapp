@@ -102,7 +102,7 @@ export default function NewMachinePage() {
               { value: "forklift", title: "フォークリフト 特定自主検査", desc: "労働安全衛生法・年次(検査業者による実施)" },
             ].map((opt, i) => (
               <label key={opt.value} className="flex cursor-pointer items-start gap-3 border border-line px-4 py-3 transition-colors has-[:checked]:border-navy has-[:checked]:bg-navysoft">
-                <input type="radio" name="legalKind" value={opt.value} defaultChecked={i === 0} className="mt-1 accent-[#1d3153]" />
+                <input type="radio" name="legalKind" value={opt.value} defaultChecked={i === 0} className="mt-1 accent-[#0066cc]" />
                 <span>
                   <span className="block text-sm font-medium">{opt.title}</span>
                   <span className="mt-0.5 block text-xs text-ink3">{opt.desc}</span>

@@ -236,7 +236,7 @@ export default async function MachineDetailPage({ params }: { params: Promise<{ 
                 <form action={issueCertificate} className="space-y-3 border-t border-line pt-4">
                   <input type="hidden" name="machineId" value={machine.id} />
                   <label className="flex items-center gap-2.5 text-sm">
-                    <input type="checkbox" name="withEnglish" className="accent-[#1d3153]" />
+                    <input type="checkbox" name="withEnglish" className="accent-[#0066cc]" />
                     英語版を同時に発行する(追加1万円)
                   </label>
                   <button

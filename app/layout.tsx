@@ -1,24 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_JP, Noto_Serif_JP, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-
-const notoSans = Noto_Sans_JP({
-  variable: "--font-noto-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-});
-
-const notoSerif = Noto_Serif_JP({
-  variable: "--font-noto-serif",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-});
-
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
 
 export const metadata: Metadata = {
   title: {
@@ -32,7 +13,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#1d3153",
+  themeColor: "#0066cc",
   interactiveWidget: "resizes-content",
 };
 
@@ -42,10 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="ja"
-      className={`${notoSans.variable} ${notoSerif.variable} ${plexMono.variable} h-full antialiased`}
-    >
+    <html lang="ja" className="h-full antialiased">
       <body className="min-h-dvh flex flex-col">{children}</body>
     </html>
   );

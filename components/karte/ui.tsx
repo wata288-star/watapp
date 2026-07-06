@@ -14,11 +14,11 @@ export function BrandMark({ compact = false, light = false }: { compact?: boolea
         className={light ? "text-paper" : "text-navy"}
       >
         <rect x="2" y="2" width="28" height="28" fill="currentColor" />
-        <path d="M9 9.5h8" stroke={light ? "#1d3153" : "#f5f4f0"} strokeWidth="2" />
-        <path d="M9 14.5h14" stroke={light ? "#1d3153" : "#f5f4f0"} strokeWidth="2" />
-        <path d="M9 19.5h14" stroke={light ? "#1d3153" : "#f5f4f0"} strokeWidth="2" />
-        <path d="M9 24.5h11" stroke={light ? "#1d3153" : "#f5f4f0"} strokeWidth="2" />
-        <rect x="20" y="6.5" width="6" height="6" fill="#9c5527" />
+        <path d="M9 9.5h8" stroke={light ? "#0066cc" : "#ffffff"} strokeWidth="2" />
+        <path d="M9 14.5h14" stroke={light ? "#0066cc" : "#ffffff"} strokeWidth="2" />
+        <path d="M9 19.5h14" stroke={light ? "#0066cc" : "#ffffff"} strokeWidth="2" />
+        <path d="M9 24.5h11" stroke={light ? "#0066cc" : "#ffffff"} strokeWidth="2" />
+        <rect x="20" y="6.5" width="6" height="6" fill="#7db4ec" />
       </svg>
       <span className="flex flex-col leading-none">
         <span
@@ -92,9 +92,9 @@ export function SaleBadge({ status }: { status: SaleStatus }) {
 }
 
 const GRADE_COLOR: Record<CertGrade, string> = {
-  A: "#1d3153",
-  B: "#4a6076",
-  C: "#85888f",
+  A: "#0066cc",
+  B: "#5b7ba3",
+  C: "#8a94a0",
 };
 
 export function GradeSeal({ grade, size = 72 }: { grade: CertGrade; size?: number }) {
@@ -107,7 +107,7 @@ export function GradeSeal({ grade, size = 72 }: { grade: CertGrade; size?: numbe
         x="40"
         y="47"
         textAnchor="middle"
-        fontFamily="var(--font-noto-serif), serif"
+        fontFamily="var(--font-serif)"
         fontSize="30"
         fontWeight="600"
         fill={c}

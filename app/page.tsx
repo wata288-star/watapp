@@ -122,7 +122,7 @@ export default function LandingPage() {
           {/* 証明書ビジュアル */}
           <div className="hidden md:block">
             <div className="relative">
-              <div className="border border-line2 bg-panel p-7 shadow-[0_1px_0_rgba(27,29,33,0.04),0_16px_40px_-24px_rgba(29,49,83,0.35)]">
+              <div className="border border-line2 bg-panel p-7 shadow-[0_1px_0_rgba(27,29,33,0.04),0_16px_40px_-24px_rgba(0,83,166,0.28)]">
                 <div className="flex items-start justify-between border-b border-line pb-4">
                   <div>
                     <p className="mk-label">機械整備履歴証明書</p>

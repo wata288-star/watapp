@@ -160,7 +160,7 @@ export default async function CertificatePage({
       </div>
 
       {/* 証明書本体 1ページ目 */}
-      <div className="print-page mx-auto max-w-[720px] border border-line2 bg-white p-10 text-ink shadow-[0_1px_0_rgba(27,29,33,0.04),0_16px_40px_-28px_rgba(29,49,83,0.4)] print:max-w-none print:border-0 print:p-0 print:shadow-none">
+      <div className="print-page mx-auto max-w-[720px] border border-line2 bg-white p-10 text-ink shadow-[0_1px_0_rgba(27,29,33,0.04),0_16px_40px_-28px_rgba(0,83,166,0.3)] print:max-w-none print:border-0 print:p-0 print:shadow-none">
         {/* ヘッダー */}
         <div className="flex items-start justify-between border-b-2 border-ink pb-5">
           <div>
@@ -308,7 +308,7 @@ export default async function CertificatePage({
       </div>
 
       {/* 2ページ目以降: 履歴明細 */}
-      <div className="mx-auto mt-8 max-w-[720px] border border-line2 bg-white p-10 text-ink shadow-[0_1px_0_rgba(27,29,33,0.04),0_16px_40px_-28px_rgba(29,49,83,0.4)] print:mt-0 print:max-w-none print:border-0 print:p-0 print:shadow-none">
+      <div className="mx-auto mt-8 max-w-[720px] border border-line2 bg-white p-10 text-ink shadow-[0_1px_0_rgba(27,29,33,0.04),0_16px_40px_-28px_rgba(0,83,166,0.3)] print:mt-0 print:max-w-none print:border-0 print:p-0 print:shadow-none">
         <div className="flex items-baseline justify-between border-b border-ink pb-3">
           <h2 className="font-serif text-lg font-semibold">{t.history}</h2>
           <p className="font-mono text-xs text-ink3">{cert.certNo}</p>

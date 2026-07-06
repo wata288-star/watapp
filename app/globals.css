@@ -10,27 +10,27 @@
   --danger: #ef4444;
   --success: #34d399;
 
-  /* ---- マシンカルテ デザイントークン ---- */
-  --mk-paper: #f5f4f0;
+  /* ---- マシンカルテ デザイントークン(白×青) ---- */
+  --mk-paper: #f7f9fc;
   --mk-panel: #ffffff;
-  --mk-panel-2: #faf9f6;
-  --mk-ink: #1b1d21;
-  --mk-ink-2: #4b4f57;
-  --mk-ink-3: #85888f;
-  --mk-line: #e3e0d8;
-  --mk-line-2: #cfcbc0;
-  --mk-navy: #1d3153;
-  --mk-navy-2: #294470;
-  --mk-navy-soft: #eef1f6;
-  --mk-copper: #9c5527;
-  --mk-copper-soft: #f4ebe2;
+  --mk-panel-2: #f0f4f9;
+  --mk-ink: #1d1d1f;
+  --mk-ink-2: #3e4652;
+  --mk-ink-3: #7d8695;
+  --mk-line: #e3e8ef;
+  --mk-line-2: #cbd4e0;
+  --mk-navy: #0066cc;
+  --mk-navy-2: #0053a6;
+  --mk-navy-soft: #eaf2fc;
+  --mk-copper: #2c5f9e;
+  --mk-copper-soft: #e8eff8;
   --mk-ok: #2f6b4f;
   --mk-ok-soft: #e9f1ec;
   --mk-warn: #9a6a1f;
   --mk-warn-soft: #f7efdd;
   --mk-danger: #a63b2e;
   --mk-danger-soft: #f6e8e5;
-  --mk-steel: #4a6076;
+  --mk-steel: #5b7ba3;
 }
 
 @theme inline {
@@ -63,16 +63,19 @@
   --color-alertsoft: var(--mk-danger-soft);
   --color-steel: var(--mk-steel);
 
-  --font-sans: var(--font-noto-sans), "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-  --font-serif: var(--font-noto-serif), "Hiragino Mincho ProN", "Yu Mincho", serif;
-  --font-mono: var(--font-plex-mono), "SFMono-Regular", Consolas, monospace;
+  /* Apple標準フォント(San Francisco / Hiragino Sans)のシステムスタック */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Segoe UI", sans-serif;
+  --font-serif: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue",
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 html,
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-noto-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   min-height: 100dvh;
   overflow: hidden; /* 旧アプリ: ページ自体のスクロールを防止 */
   overscroll-behavior: none;
