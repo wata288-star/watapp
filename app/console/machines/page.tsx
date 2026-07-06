@@ -115,6 +115,7 @@ export default async function MachinesPage({
                 <th className="px-4 py-3 text-right font-medium">記録件数</th>
                 <th className="px-4 py-3 font-medium">最終記録</th>
                 <th className="px-4 py-3 font-medium">記録充実度</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -138,6 +139,16 @@ export default async function MachinesPage({
                       {grade}
                     </span>
                     <span className="ml-1.5 align-middle text-xs text-ink3">相当</span>
+                  </td>
+                  <td className="px-4 py-3.5">
+                    {m.status !== "sold" && (
+                      <Link
+                        href={`/m/machines/${m.id}/inspect`}
+                        className="relative z-10 inline-flex items-center gap-1.5 whitespace-nowrap border border-navy/40 bg-navysoft px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-navy hover:text-white"
+                      >
+                        定期自主整備
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ))}

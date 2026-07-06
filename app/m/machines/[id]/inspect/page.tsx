@@ -6,7 +6,7 @@ import { inspectionItemsFor } from "@/lib/karte/master";
 import { InspectionWizard } from "@/components/karte/inspection-wizard";
 import { IconArrowLeft } from "@/components/karte/icons";
 
-export const metadata = { title: "定期点検" };
+export const metadata = { title: "定期自主整備" };
 
 export default async function InspectPage({
   params,
@@ -38,9 +38,9 @@ export default async function InspectPage({
         <IconArrowLeft width={15} height={15} />
         {machine.name}
       </Link>
-      <h1 className="mt-3 font-serif text-xl font-semibold">定期点検</h1>
+      <h1 className="mt-3 font-serif text-xl font-semibold">定期自主整備</h1>
       <p className="mb-6 mt-1 text-[13px] leading-6 text-ink3">
-        査定・記録項目マスターに沿って1項目ずつ確認します。結果はそのまま査定準備状況に反映されます。
+        記録項目マスターに沿って、1項目ずつ「写真を撮って→コメント」で記録していきます。結果はそのまま査定準備状況と履歴証明書に反映されます。
       </p>
       <InspectionWizard
         machineId={machine.id}

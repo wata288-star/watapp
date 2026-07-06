@@ -255,10 +255,10 @@ export async function createInspection(formData: FormData): Promise<void> {
     companyId: user.companyId,
     userId: user.id,
     type: "inspection",
-    title: "定期点検(項目チェック)",
-    titleEn: "Periodic inspection (itemized checklist)",
+    title: "定期自主整備(項目点検)",
+    titleEn: "Periodic self-maintenance (itemized)",
     memo:
-      `記録項目マスターに沿って${items.length}項目を点検。良${ok} / 否${ng} / 対象外${na}、写真${photoCount}枚。` +
+      `定期自主整備として記録項目マスターの${items.length}項目を実施。良${ok} / 否${ng} / 対象外${na}、写真${photoCount}枚。` +
       (ngLabels.length ? ` 要対応: ${ngLabels.join("、")}。` : ""),
     items,
     photoFileIds: [],

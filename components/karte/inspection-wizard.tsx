@@ -82,7 +82,7 @@ export function InspectionWizard({
     const photos = items.filter((it) => states[it.id]?.photoFileId).length;
     return (
       <div>
-        <p className="mk-label">点検結果の確認</p>
+        <p className="mk-label">定期自主整備 — 結果の確認</p>
         <h2 className="mt-1 font-serif text-xl font-semibold">全{items.length}項目の点検が完了</h2>
         <div className="mt-4 grid grid-cols-3 gap-px border border-line bg-line text-center">
           {[
@@ -153,7 +153,7 @@ export function InspectionWizard({
             disabled={pending}
             className="w-full bg-navy px-4 py-3.5 text-sm font-medium text-white transition-colors hover:bg-navy2 disabled:opacity-50"
           >
-            {pending ? "保存中..." : `${machineName} の定期点検を保存する`}
+            {pending ? "保存中..." : `${machineName} の定期自主整備を保存する`}
           </button>
           <p className="mt-3 flex items-start gap-2 text-[11px] leading-5 text-ink3">
             <IconShield width={14} height={14} className="mt-0.5 shrink-0" />
@@ -195,30 +195,9 @@ export function InspectionWizard({
       <h2 className="mt-2 font-serif text-xl font-semibold leading-snug">{item!.label}</h2>
       <p className="mt-2 text-[13px] leading-6 text-ink2">{item!.desc}</p>
 
-      {/* 結果 */}
-      <div className="mt-5 grid grid-cols-3 gap-1.5">
-        {(["ok", "ng", "na"] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => patch(item!.id, { result: v })}
-            className={`py-3.5 text-sm font-semibold transition-colors ${
-              st?.result === v
-                ? v === "ok"
-                  ? "bg-ok text-white"
-                  : v === "ng"
-                    ? "bg-alert text-white"
-                    : "bg-ink2 text-white"
-                : "border border-line2 bg-panel text-ink2"
-            }`}
-          >
-            {RESULT_LABEL[v]}
-          </button>
-        ))}
-      </div>
-
-      {/* 写真: カメラ起動→撮影即時アップロード(編集不可) */}
-      <div className="mt-4">
+      {/* 1. 写真: カメラ起動→撮影即時アップロード(編集不可) */}
+      <div className="mt-5">
+        <p className="mk-label mb-2">1. 写真を撮る</p>
         {st?.photoFileId ? (
           <div className="flex items-center gap-3 border border-ok/30 bg-oksoft px-3.5 py-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -247,13 +226,10 @@ export function InspectionWizard({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={st?.uploading}
-            className="flex w-full items-center justify-center gap-2.5 border border-dashed border-line2 bg-panel2 px-4 py-4 text-sm font-medium text-ink2 transition-colors hover:border-navy disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2.5 bg-navy px-4 py-5 text-sm font-semibold text-white transition-colors hover:bg-navy2 disabled:opacity-60"
           >
-            <IconCamera width={19} height={19} className="text-ink3" />
+            <IconCamera width={20} height={20} />
             {st?.uploading ? "アップロード中..." : "カメラを起動して撮影"}
-            {item!.impact === "高" && !st?.uploading && (
-              <span className="text-[10px] tracking-wider text-copper">推奨</span>
-            )}
           </button>
         )}
         <input
@@ -276,13 +252,41 @@ export function InspectionWizard({
         )}
       </div>
 
-      {/* メモ */}
-      <input
-        value={st?.note ?? ""}
-        onChange={(e) => patch(item!.id, { note: e.target.value })}
-        placeholder="気づき(任意) 例: 前回よりわずかに音が大きい"
-        className="mt-4 w-full border border-line2 bg-panel px-3.5 py-2.5 text-sm outline-none focus:border-navy"
-      />
+      {/* 2. コメント */}
+      <div className="mt-4">
+        <p className="mk-label mb-2">2. コメントを残す</p>
+        <input
+          value={st?.note ?? ""}
+          onChange={(e) => patch(item!.id, { note: e.target.value })}
+          placeholder="例: 異音なし。前回よりベルトの張りやや緩め。"
+          className="w-full border border-line2 bg-panel px-3.5 py-3 text-sm outline-none focus:border-navy"
+        />
+      </div>
+
+      {/* 3. 判定 */}
+      <div className="mt-4">
+        <p className="mk-label mb-2">3. 状態の判定</p>
+        <div className="grid grid-cols-3 gap-1.5">
+          {(["ok", "ng", "na"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => patch(item!.id, { result: v })}
+              className={`py-3.5 text-sm font-semibold transition-colors ${
+                st?.result === v
+                  ? v === "ok"
+                    ? "bg-ok text-white"
+                    : v === "ng"
+                      ? "bg-alert text-white"
+                      : "bg-ink2 text-white"
+                  : "border border-line2 bg-panel text-ink2"
+              }`}
+            >
+              {RESULT_LABEL[v]}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* ナビ */}
       <div className="mt-5 flex gap-2">

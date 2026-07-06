@@ -47,7 +47,7 @@ export default async function MobileMachinesPage({
             const records = recordsOfMachine(user.companyId, m.id);
             return (
               <li key={m.id}>
-                <Link href={`/m/machines/${m.id}`} className="flex items-center gap-3 px-4 py-3.5">
+                <Link href={`/m/machines/${m.id}`} className="flex items-center gap-3 px-4 pb-2 pt-3.5">
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
                       <span className="truncate text-sm font-medium">{m.name}</span>
@@ -63,6 +63,14 @@ export default async function MobileMachinesPage({
                   </span>
                   <IconChevronRight width={16} height={16} className="shrink-0 text-line2" />
                 </Link>
+                <div className="px-4 pb-3">
+                  <Link
+                    href={`/m/machines/${m.id}/inspect`}
+                    className="inline-flex items-center gap-1.5 border border-navy/40 bg-navysoft px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:bg-navy hover:text-white"
+                  >
+                    定期自主整備を開始
+                  </Link>
+                </div>
               </li>
             );
           })}

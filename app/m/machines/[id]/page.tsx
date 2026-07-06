@@ -70,7 +70,7 @@ export default async function MobileMachinePage({
           className="flex items-center justify-center gap-2.5 bg-navy px-4 py-4 text-sm font-medium text-white transition-colors hover:bg-navy2"
         >
           <IconCheck width={17} height={17} />
-          定期点検を開始する(項目チェック)
+          定期自主整備を開始する
         </Link>
         <Link
           href={`/m/machines/${machine.id}/record${via === "qr" ? "?via=qr" : ""}`}
