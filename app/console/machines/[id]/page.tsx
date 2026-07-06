@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/karte/session";
 import { machineOf, recordsOfMachine, salesOf, certificatesOf } from "@/lib/karte/queries";
 import { computeGrade, nextLegalDue } from "@/lib/karte/grade";
 import { detectAnomalies } from "@/lib/karte/anomaly";
+import { assessReadiness } from "@/lib/karte/master";
 import { fmtDate, todayIso } from "@/lib/karte/format";
 import { qrSvg, baseUrl } from "@/lib/karte/qr";
 import { PageTitle, StatusBadge, KV, SecondaryLink, PrimaryLink, GradeSeal } from "@/components/karte/ui";
@@ -22,6 +23,7 @@ export default async function MachineDetailPage({ params }: { params: Promise<{ 
   const records = recordsOfMachine(user.companyId, machine.id);
   const { grade, summary } = computeGrade(machine, records);
   const auditFlags = detectAnomalies(machine, records, salesOf(user.companyId));
+  const readiness = assessReadiness(machine, records, todayIso());
   const due = nextLegalDue(machine, records);
   const today = todayIso();
   const overdue = due != null && due < today;
@@ -92,6 +94,63 @@ export default async function MachineDetailPage({ params }: { params: Promise<{ 
             {machine.notes && (
               <p className="border-t border-line px-6 py-4 text-[13px] leading-6 text-ink2">{machine.notes}</p>
             )}
+          </section>
+
+          {/* 査定準備状況 */}
+          <section className="border border-line bg-panel">
+            <h2 className="flex items-baseline justify-between border-b border-line px-6 py-4">
+              <span className="font-serif text-base font-semibold">査定準備状況</span>
+              <Link
+                href={`/console/templates${machine.machineType ? `?type=${encodeURIComponent(machine.machineType)}` : ""}`}
+                className="text-xs text-navy underline underline-offset-4"
+              >
+                記録項目マスター
+              </Link>
+            </h2>
+            <div className="px-6 py-5">
+              <div className="flex items-baseline justify-between">
+                <p className="text-sm text-ink2">
+                  査定インパクト「高」の項目
+                  {machine.machineType && (
+                    <span className="ml-1.5 text-xs text-ink3">({machine.machineType})</span>
+                  )}
+                </p>
+                <p className="font-serif text-lg font-semibold mk-tabular">
+                  {readiness.highOk}
+                  <span className="text-sm font-normal text-ink3"> / {readiness.highTotal}</span>
+                </p>
+              </div>
+              <div className="mt-2 h-1.5 w-full bg-panel2">
+                <div
+                  className="h-full bg-navy"
+                  style={{ width: `${Math.round((readiness.highOk / Math.max(readiness.highTotal, 1)) * 100)}%` }}
+                />
+              </div>
+              {readiness.missingHigh.length === 0 ? (
+                <p className="mt-4 text-[13px] leading-6 text-ok">
+                  査定で重視される項目は一通り記録されています。売却時も履歴証明書の説得力が高い状態です。
+                </p>
+              ) : (
+                <>
+                  <p className="mt-4 text-xs text-ink3">
+                    記録が不足している高インパクト項目(買取価格を直接左右します):
+                  </p>
+                  <ul className="mt-2 space-y-1.5">
+                    {readiness.missingHigh.slice(0, 5).map((s) => (
+                      <li key={s.item.id} className="flex items-center justify-between gap-3 text-[13px]">
+                        <span className="text-ink">{s.item.label}</span>
+                        <span className={`shrink-0 text-xs ${s.status === "missing" ? "text-alert" : "text-warn"}`}>
+                          {s.status === "missing" ? "未記録" : "要更新(1年超)"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              <p className="mt-4 border-t border-line pt-3 text-[11px] leading-5 text-ink3">
+                中古買取業者の公開査定情報に基づく項目マスターと照合しています。現場入力は「写真+一言」のまま、記録との対応付けは自動で行われます。
+              </p>
+            </div>
           </section>
 
           {/* QR */}

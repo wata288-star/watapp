@@ -313,6 +313,7 @@ export function buildSeed(): Database {
   const machines: Machine[] = [
     {
       id: "m_nc1",
+      machineType: "NC旋盤",
       companyId: "c_yamato",
       code: "K7F3-A2BC",
       name: "NC旋盤 1号機",
@@ -337,6 +338,7 @@ export function buildSeed(): Database {
     },
     {
       id: "m_mc1",
+      machineType: "マシニングセンタ",
       companyId: "c_yamato",
       code: "M4QN-8XLD",
       name: "マシニングセンタ 3号機",
@@ -357,6 +359,7 @@ export function buildSeed(): Database {
     },
     {
       id: "m_press1",
+      machineType: "プレス機械",
       companyId: "c_yamato",
       code: "P2TV-6HJW",
       name: "200tプレス 1号機",
@@ -385,6 +388,7 @@ export function buildSeed(): Database {
     },
     {
       id: "m_press2",
+      machineType: "プレス機械",
       companyId: "c_yamato",
       code: "P9RD-3KMF",
       name: "80tプレス 2号機",
@@ -411,6 +415,7 @@ export function buildSeed(): Database {
     },
     {
       id: "m_inj1",
+      machineType: "射出成形機",
       companyId: "c_yamato",
       code: "J5WB-7NPQ",
       name: "射出成形機 5号機",
@@ -431,6 +436,7 @@ export function buildSeed(): Database {
     },
     {
       id: "m_inj2",
+      machineType: "射出成形機",
       companyId: "c_yamato",
       code: "J8ZC-2RSU",
       name: "射出成形機 6号機",
@@ -452,6 +458,7 @@ export function buildSeed(): Database {
     },
     {
       id: "m_grind1",
+      machineType: "研削盤",
       companyId: "c_yamato",
       code: "G6HK-4TVX",
       name: "平面研削盤 1号機",
@@ -471,6 +478,7 @@ export function buildSeed(): Database {
     },
     {
       id: "m_lathe2",
+      machineType: "NC旋盤",
       companyId: "c_yamato",
       code: "L3MN-9WYA",
       name: "CNC旋盤 2号機",
@@ -491,6 +499,7 @@ export function buildSeed(): Database {
     },
     {
       id: "m_comp1",
+      machineType: "コンプレッサー",
       companyId: "c_yamato",
       code: "C1PQ-5BDE",
       name: "スクリューコンプレッサ",
@@ -555,6 +564,7 @@ export function buildSeed(): Database {
     // ---- 北陸フーズ ----
     {
       id: "h_mixer",
+      machineType: "食品機械",
       companyId: "c_hokuriku",
       code: "H4JK-2LMN",
       name: "真空ミキサー 1号機",
@@ -579,6 +589,7 @@ export function buildSeed(): Database {
     },
     {
       id: "h_filler",
+      machineType: "食品機械",
       companyId: "c_hokuriku",
       code: "H8PQ-5RST",
       name: "自動充填機",
@@ -603,6 +614,7 @@ export function buildSeed(): Database {
     },
     {
       id: "h_oven",
+      machineType: "食品機械",
       companyId: "c_hokuriku",
       code: "H3UV-9WXY",
       name: "トンネルオーブン",

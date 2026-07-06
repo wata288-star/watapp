@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/karte/session";
 import { machineOf, recordsOfMachine } from "@/lib/karte/queries";
 import { computeGrade, nextLegalDue } from "@/lib/karte/grade";
+import { assessReadiness } from "@/lib/karte/master";
 import { fmtDate, todayIso } from "@/lib/karte/format";
 import { StatusBadge, KV } from "@/components/karte/ui";
 import { RecordTimeline } from "@/components/karte/record-timeline";
@@ -27,6 +28,7 @@ export default async function MobileMachinePage({
   const { summary } = computeGrade(machine, records);
   const due = nextLegalDue(machine, records);
   const overdue = due != null && due < todayIso();
+  const readiness = assessReadiness(machine, records, todayIso());
 
   return (
     <div className="px-4 py-6">
@@ -88,6 +90,33 @@ export default async function MobileMachinePage({
           </p>
         </div>
       )}
+
+      {/* 査定準備状況 */}
+      <div className="mt-4 border border-line bg-panel px-4 py-3.5">
+        <div className="flex items-baseline justify-between">
+          <p className="text-[13px] font-semibold">査定準備状況</p>
+          <p className="font-serif text-base font-semibold mk-tabular">
+            {readiness.highOk}
+            <span className="text-xs font-normal text-ink3"> / {readiness.highTotal}</span>
+          </p>
+        </div>
+        <div className="mt-1.5 h-1 w-full bg-panel2">
+          <div
+            className="h-full bg-navy"
+            style={{ width: `${Math.round((readiness.highOk / Math.max(readiness.highTotal, 1)) * 100)}%` }}
+          />
+        </div>
+        {readiness.missingHigh.length > 0 ? (
+          <p className="mt-2 text-[11px] leading-5 text-ink3">
+            記録が薄い項目:{" "}
+            <span className="text-copper">
+              {readiness.missingHigh.slice(0, 3).map((s) => s.item.label).join(" / ")}
+            </span>
+          </p>
+        ) : (
+          <p className="mt-2 text-[11px] leading-5 text-ok">査定で重視される項目は記録済みです。</p>
+        )}
+      </div>
 
       {/* 履歴 */}
       <h2 className="mb-2.5 mt-7 mk-label">整備履歴(全{records.length}件)</h2>

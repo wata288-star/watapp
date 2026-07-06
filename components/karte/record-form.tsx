@@ -42,6 +42,7 @@ export function RecordForm({
   from,
   viaQr = false,
   correctionOf,
+  hints = [],
 }: {
   machineId: string;
   machineName: string;
@@ -49,6 +50,7 @@ export function RecordForm({
   from: "console" | "m";
   viaQr?: boolean;
   correctionOf?: { id: string; title: string; date: string } | null;
+  hints?: string[]; // 査定準備状況で不足している高インパクト項目
 }) {
   const [memo, setMemo] = useState("");
   const [typeChoice, setTypeChoice] = useState<RecordType | "auto">("auto");
@@ -135,6 +137,23 @@ export function RecordForm({
           </div>
         )}
       </div>
+
+      {/* 記録の狙いどころ(査定準備状況で不足している項目) */}
+      {hints.length > 0 && !correctionOf && (
+        <div className="border border-line bg-panel px-4 py-3.5">
+          <p className="mk-label mb-1.5">記録の狙いどころ</p>
+          <p className="text-xs leading-5 text-ink3">
+            査定で重視されるうち、この機械でまだ記録が薄い項目です。写真と一言で残しておくと売却時に効きます。
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {hints.map((h) => (
+              <li key={h} className="border border-copper/30 bg-coppersoft px-2.5 py-1 text-xs font-medium text-copper">
+                {h}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* 一言メモ */}
       <div>

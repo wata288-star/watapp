@@ -69,6 +69,7 @@ export interface Machine {
   name: string; // 呼称 (例: NC旋盤 1号機)
   nameEn: string;
   category: MachineCategory;
+  machineType?: string; // 記録項目マスターの機種 (10機種、該当なしはundefined)
   maker: string;
   makerEn: string;
   model: string;

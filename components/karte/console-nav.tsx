@@ -9,12 +9,14 @@ import {
   IconCert,
   IconExchange,
   IconBuilding,
+  IconList,
 } from "./icons";
 
 const ITEMS = [
   { href: "/console", label: "ダッシュボード", icon: IconGrid, exact: true },
   { href: "/console/machines", label: "機械台帳", icon: IconMachine },
   { href: "/console/records", label: "整備記録", icon: IconRecord },
+  { href: "/console/templates", label: "記録項目", icon: IconList },
   { href: "/console/certificates", label: "履歴証明書", icon: IconCert, adminOnly: true },
   { href: "/console/sales", label: "売却・送客", icon: IconExchange, adminOnly: true },
   { href: "/console/settings", label: "設定", icon: IconBuilding },

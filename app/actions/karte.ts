@@ -63,6 +63,7 @@ export async function createMachine(formData: FormData): Promise<void> {
     name,
     nameEn: String(formData.get("nameEn") ?? "").trim() || name,
     category: (String(formData.get("category") ?? "その他") as MachineCategory),
+    machineType: String(formData.get("machineType") ?? "").trim() || undefined,
     maker,
     makerEn: String(formData.get("makerEn") ?? "").trim() || maker,
     model,

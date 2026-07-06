@@ -4,7 +4,8 @@ import { getCurrentUser } from "@/lib/karte/session";
 import { machineOf, recordsOfMachine } from "@/lib/karte/queries";
 import { RecordForm } from "@/components/karte/record-form";
 import { IconArrowLeft } from "@/components/karte/icons";
-import { fmtDate } from "@/lib/karte/format";
+import { fmtDate, todayIso } from "@/lib/karte/format";
+import { assessReadiness } from "@/lib/karte/master";
 
 export const metadata = { title: "記録する" };
 
@@ -29,9 +30,11 @@ export default async function MobileRecordPage({
   const machine = machineOf(user.companyId, id);
   if (!machine) notFound();
 
-  const target = correct
-    ? recordsOfMachine(user.companyId, machine.id).find((r) => r.id === correct)
-    : undefined;
+  const records = recordsOfMachine(user.companyId, machine.id);
+  const target = correct ? records.find((r) => r.id === correct) : undefined;
+  const hints = assessReadiness(machine, records, todayIso())
+    .missingHigh.slice(0, 3)
+    .map((s) => s.item.label);
 
   return (
     <div className="px-4 py-6">
@@ -55,6 +58,7 @@ export default async function MobileRecordPage({
         from="m"
         viaQr={via === "qr"}
         correctionOf={target ? { id: target.id, title: target.title, date: fmtDate(target.workDate) } : null}
+        hints={hints}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 import { createMachine } from "@/app/actions/karte";
 import { PageTitle } from "@/components/karte/ui";
+import { MACHINE_TYPES } from "@/lib/karte/master";
 import type { MachineCategory } from "@/lib/karte/types";
 
 export const metadata = { title: "機械の登録" };
@@ -44,6 +45,14 @@ export default function NewMachinePage() {
               <select name="category" required className={inputClass}>
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="機種(記録項目マスター)">
+              <select name="machineType" className={inputClass}>
+                <option value="">該当なし(共通項目のみ)</option>
+                {MACHINE_TYPES.map((mt) => (
+                  <option key={mt} value={mt}>{mt}</option>
                 ))}
               </select>
             </Field>
