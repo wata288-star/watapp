@@ -1,0 +1,1788 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TOMARUN ― 動くUIデモ</title>
+<style>
+/* ==========================================================================
+   TOMARUN / design tokens
+   現場（手袋・騒音・暗所）で使う前提。タップ最小56px、本文15px以上。
+   機械が出す値（エラーコード・時刻・アワーメーター・記録番号）は等幅で組む。
+   ========================================================================== */
+:root{
+  color-scheme: light dark;
+
+  --paper:#f2f5f8;        /* 機械の塗装に寄せた青みグレー */
+  --card:#ffffff;
+  --sunk:#e9eef4;
+  --line:#e982ef00;
+  --line:#e1e7ef;
+  --ink:#0f141c;          /* 青みを含む黒。純黒は使わない */
+  --ink-2:#48566b;
+  --ink-3:#7a8798;
+  --signal:#1f5fe0;       /* 操作はこの一色だけ */
+  --signal-soft:#e8effc;
+  --signal-line:#c6d8f8;
+  --halt:#e0393e;         /* 停止・危険 */
+  --halt-soft:#fdeaea;
+  --clear:#0e9c6b;        /* 解決・完了 */
+  --clear-soft:#e6f6ef;
+  --caution:#b7770b;      /* 注意 */
+  --caution-soft:#fbf1de;
+  --panel:#0f141c;        /* 暗いパネル面（プレイヤー・プロフィール） */
+  --panel-ink:#c6d2e4;
+
+  --f:1;                                  /* 文字サイズ設定の倍率 */
+  --t-micro:calc(11.5px * var(--f));
+  --t-sm:calc(13px * var(--f));
+  --t-body:calc(15px * var(--f));
+  --t-lg:calc(17px * var(--f));
+  --t-h2:calc(20px * var(--f));
+  --t-h1:calc(24px * var(--f));
+
+  --r-card:20px;
+  --r-ctl:14px;
+  --tap:56px;
+
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Noto Sans JP",Meiryo,system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono","Roboto Mono","Noto Sans Mono",monospace;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#0b0f16; --card:#141a24; --sunk:#1b2330; --line:#26303f;
+    --ink:#e9eef6; --ink-2:#a7b4c6; --ink-3:#78859a;
+    --signal:#6e9cff; --signal-soft:#182740; --signal-line:#2c4370;
+    --halt:#ff6b6f; --halt-soft:#33191b; --clear:#3ecf9a; --clear-soft:#12271f;
+    --caution:#e0a44a; --caution-soft:#2b2114;
+    --panel:#05080d; --panel-ink:#9fb0c8;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0b0f16; --card:#141a24; --sunk:#1b2330; --line:#26303f;
+  --ink:#e9eef6; --ink-2:#a7b4c6; --ink-3:#78859a;
+  --signal:#6e9cff; --signal-soft:#182740; --signal-line:#2c4370;
+  --halt:#ff6b6f; --halt-soft:#33191b; --clear:#3ecf9a; --clear-soft:#12271f;
+  --caution:#e0a44a; --caution-soft:#2b2114;
+  --panel:#05080d; --panel-ink:#9fb0c8;
+}
+:root[data-theme="light"]{
+  --paper:#f2f5f8; --card:#ffffff; --sunk:#e9eef4; --line:#e1e7ef;
+  --ink:#0f141c; --ink-2:#48566b; --ink-3:#7a8798;
+  --signal:#1f5fe0; --signal-soft:#e8effc; --signal-line:#c6d8f8;
+  --halt:#e0393e; --halt-soft:#fdeaea; --clear:#0e9c6b; --clear-soft:#e6f6ef;
+  --caution:#b7770b; --caution-soft:#fbf1de;
+  --panel:#0f141c; --panel-ink:#c6d2e4;
+}
+
+*,*::before,*::after{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  min-height:100dvh;
+  background:
+    radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--signal) 7%, transparent), transparent 60%),
+    var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;}
+a{color:inherit;text-decoration:none;}
+input,textarea,select{font:inherit;color:inherit;}
+:focus-visible{outline:2.5px solid var(--signal);outline-offset:2px;border-radius:6px;}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-0.01em;}
+
+/* --------------------------------------------------------------- ステージ */
+.stage{
+  min-height:100dvh;
+  display:grid;
+  grid-template-columns:220px auto;
+  gap:56px;
+  padding:28px;
+  align-items:center;
+  justify-content:center;
+}
+.rail{
+  align-self:center;
+  justify-self:end;
+  width:100%;
+  max-width:220px;
+}
+.rail__brand{
+  display:flex;align-items:baseline;gap:8px;margin-bottom:4px;
+  font-size:15px;font-weight:900;letter-spacing:.06em;
+}
+.rail__brand i{font-style:normal;color:var(--signal);}
+.rail__tag{
+  font-size:11.5px;font-weight:700;color:var(--ink-3);
+  margin-bottom:18px;letter-spacing:.02em;
+}
+.rail__group{
+  font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-3);margin:16px 0 6px;
+}
+.rail__item{
+  display:flex;align-items:center;gap:8px;width:100%;
+  padding:7px 10px;border-radius:9px;text-align:left;
+  font-size:12.5px;font-weight:700;color:var(--ink-2);
+}
+.rail__item:hover{background:var(--sunk);}
+.rail__item[data-on="true"]{background:var(--signal-soft);color:var(--signal);}
+.rail__item::before{
+  content:"";width:5px;height:5px;border-radius:50%;
+  background:currentColor;opacity:.35;flex:none;
+}
+.rail__item[data-on="true"]::before{opacity:1;}
+.rail__note{
+  margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
+  font-size:11px;line-height:1.75;color:var(--ink-3);font-weight:600;
+}
+
+/* --------------------------------------------------------------- 実機枠 */
+.device{
+  width:min(100%,394px);
+  height:min(852px, calc(100dvh - 56px));
+  background:var(--card);
+  border:11px solid #0b0f16;
+  border-radius:52px;
+  box-shadow:0 40px 80px -30px rgba(9,16,30,.5), 0 0 0 1px rgba(9,16,30,.18);
+  overflow:hidden;
+  position:relative;
+  display:flex;flex-direction:column;
+}
+:root[data-theme="dark"] .device{border-color:#000;}
+.app{
+  flex:1;min-height:0;display:flex;flex-direction:column;
+  background:var(--paper);color:var(--ink);
+  font-size:var(--t-body);line-height:1.7;
+  position:relative;overflow:hidden;
+}
+
+/* ステータスバー */
+.statusbar{
+  flex:none;display:flex;align-items:center;justify-content:space-between;
+  padding:12px 26px 4px;background:var(--card);
+  font-family:var(--mono);font-size:12.5px;font-weight:700;letter-spacing:.02em;
+}
+.statusbar__right{display:flex;align-items:center;gap:5px;opacity:.9;}
+.statusbar--onpanel{background:transparent;color:#fff;position:absolute;top:0;left:0;right:0;z-index:3;}
+
+@media (max-width:900px){
+  .stage{grid-template-columns:minmax(0,1fr);gap:0;padding:0;}
+  .rail{display:none;}
+  .device{width:100%;height:100dvh;border:0;border-radius:0;box-shadow:none;}
+}
+
+/* --------------------------------------------------------------- ヘッダー */
+.bar{
+  flex:none;display:flex;align-items:center;gap:12px;
+  padding:6px 16px 14px;background:var(--card);
+  border-bottom:1px solid var(--line);
+}
+.bar__back{
+  flex:none;width:40px;height:40px;border-radius:12px;background:var(--sunk);
+  display:grid;place-items:center;color:var(--ink-2);
+}
+.bar__back:active{background:var(--signal-soft);color:var(--signal);}
+.bar__t{flex:1;min-width:0;}
+.bar__t b{display:block;font-size:var(--t-lg);font-weight:900;line-height:1.4;letter-spacing:.01em;}
+.bar__t span{display:block;font-size:var(--t-micro);font-weight:700;color:var(--ink-3);}
+.bar__act{
+  flex:none;display:flex;align-items:center;gap:6px;height:40px;padding:0 13px;
+  border-radius:12px;background:var(--signal-soft);color:var(--signal);
+  font-size:var(--t-sm);font-weight:800;
+}
+
+/* --------------------------------------------------------------- 本文 */
+.view{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
+/* ホームだけは2カードで残りの高さを埋める */
+.view[data-screen="home"]{display:flex;flex-direction:column;}
+.pad{padding:16px 16px 24px;display:flex;flex-direction:column;gap:14px;}
+.lead{margin:0;font-size:var(--t-sm);font-weight:600;color:var(--ink-3);line-height:1.75;}
+
+.label{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin:6px 2px -4px;
+  font-family:var(--mono);font-size:10.5px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+}
+.label em{font-style:normal;font-family:var(--sans);letter-spacing:0;text-transform:none;font-size:var(--t-micro);}
+
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);
+}
+.card--pad{padding:16px 18px;}
+.list{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden;}
+
+/* 行 */
+.row{
+  display:flex;align-items:center;gap:13px;width:100%;
+  min-height:var(--tap);padding:14px 16px;text-align:left;
+  border-bottom:1px solid var(--line);
+}
+.row:last-child{border-bottom:none;}
+.row:active{background:var(--sunk);}
+.row__ico{
+  flex:none;width:38px;height:38px;border-radius:11px;
+  background:var(--signal-soft);color:var(--signal);display:grid;place-items:center;
+}
+.row__b{flex:1;min-width:0;}
+.row__b b{display:block;font-size:var(--t-body);font-weight:800;line-height:1.5;}
+.row__b p{margin:1px 0 0;font-size:var(--t-micro);font-weight:600;color:var(--ink-3);line-height:1.6;}
+.row__chev{flex:none;color:var(--ink-3);opacity:.6;}
+
+/* ボタン */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  min-height:var(--tap);padding:8px 18px;border-radius:var(--r-ctl);
+  font-size:var(--t-lg);font-weight:800;letter-spacing:.02em;line-height:1.35;
+  transition:transform .07s ease, background .15s ease;
+}
+.btn:active{transform:scale(.985);}
+.btn--primary{background:var(--signal);color:#fff;}
+:root[data-theme="dark"] .btn--primary{color:#0b0f16;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn--primary{color:#0b0f16;}}
+.btn--ghost{background:var(--card);color:var(--ink);border:1.5px solid var(--line);}
+.btn--soft{background:var(--signal-soft);color:var(--signal);}
+.btn--sm{min-height:46px;font-size:var(--t-sm);border-radius:12px;}
+.btn[disabled]{opacity:.4;pointer-events:none;}
+
+.dock{
+  flex:none;display:flex;gap:10px;padding:12px 16px;
+  background:color-mix(in srgb, var(--card) 92%, transparent);
+  backdrop-filter:blur(10px);border-top:1px solid var(--line);
+}
+.dock .btn{flex:1;min-width:0;font-size:var(--t-body);}
+
+/* チップ */
+.chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chiprow{display:flex;gap:8px;overflow-x:auto;padding:2px 16px;margin:0 -16px;scrollbar-width:none;}
+.chiprow::-webkit-scrollbar{display:none;}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 15px;
+  border-radius:999px;border:1.5px solid var(--line);background:var(--card);
+  font-size:var(--t-sm);font-weight:700;color:var(--ink-2);white-space:nowrap;
+}
+.chip[data-on="true"]{border-color:var(--signal);background:var(--signal-soft);color:var(--signal);}
+.chip--sm{min-height:38px;padding:0 13px;font-size:var(--t-micro);}
+.chip i{
+  font-style:normal;display:inline-grid;place-items:center;min-width:18px;height:18px;
+  padding:0 5px;border-radius:999px;background:var(--caution);color:#fff;
+  font-family:var(--mono);font-size:10px;font-weight:700;
+}
+
+/* タグ */
+.tag{
+  display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:7px;
+  font-size:var(--t-micro);font-weight:800;line-height:1.6;white-space:nowrap;
+}
+.tag--code{font-family:var(--mono);font-size:11px;letter-spacing:.02em;background:var(--halt-soft);color:var(--halt);}
+.tag--signal{background:var(--signal-soft);color:var(--signal);}
+.tag--clear{background:var(--clear-soft);color:var(--clear);}
+.tag--caution{background:var(--caution-soft);color:var(--caution);}
+.tag--mute{background:var(--sunk);color:var(--ink-3);}
+
+/* 入力 */
+.input,.textarea,.select{
+  width:100%;min-height:var(--tap);padding:14px 15px;border-radius:var(--r-ctl);
+  border:1.5px solid var(--line);background:var(--card);
+  font-size:16px;font-weight:600;
+}
+.textarea{min-height:132px;line-height:1.85;resize:vertical;font-size:var(--t-body);}
+.search{
+  display:flex;align-items:center;gap:11px;height:var(--tap);padding:0 16px;
+  border-radius:var(--r-ctl);background:var(--card);border:1.5px solid var(--line);color:var(--ink-3);
+}
+.search input{flex:1;min-width:0;border:0;outline:0;background:none;font-size:16px;font-weight:600;color:var(--ink);}
+
+/* 注意ブロック（原文のまま・省略しない） */
+.notice{
+  display:flex;gap:11px;padding:14px 16px;border-radius:var(--r-ctl);
+  font-size:var(--t-sm);font-weight:600;line-height:1.85;border:1px solid;
+}
+.notice b{
+  display:block;font-family:var(--mono);font-size:10.5px;font-weight:700;
+  letter-spacing:.16em;text-transform:uppercase;margin-bottom:3px;
+}
+.notice svg{flex:none;margin-top:3px;}
+.notice--halt{background:var(--halt-soft);border-color:color-mix(in srgb,var(--halt) 30%,transparent);color:var(--halt);}
+.notice--caution{background:var(--caution-soft);border-color:color-mix(in srgb,var(--caution) 30%,transparent);color:var(--caution);}
+.notice--signal{background:var(--signal-soft);border-color:var(--signal-line);color:var(--signal);}
+.notice--halt span,.notice--caution span,.notice--signal span{color:var(--ink);display:block;}
+
+/* --------------------------------------------------------------- タブバー */
+.tabs{
+  flex:none;display:grid;grid-template-columns:repeat(4,1fr);
+  background:var(--card);border-top:1px solid var(--line);
+  padding-bottom:max(6px, env(safe-area-inset-bottom));
+}
+.tab{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  min-height:58px;color:var(--ink-3);font-size:10.5px;font-weight:800;letter-spacing:.02em;
+}
+.tab[data-on="true"]{color:var(--signal);}
+
+/* --------------------------------------------------------------- ホーム */
+.hero{position:relative;flex:none;background:var(--panel);overflow:hidden;}
+.btn--stack{flex-direction:column;gap:1px;line-height:1.3;}
+.btn--stack small{font-size:calc(11px * var(--f));font-weight:700;color:var(--ink-3);}
+.hero canvas{display:block;width:100%;height:100%;position:absolute;inset:0;}
+.hero__in{position:relative;padding:56px 20px 26px;}
+.hero__top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.hero__tenant{
+  display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:999px;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);
+  color:#fff;font-size:var(--t-micro);font-weight:800;backdrop-filter:blur(4px);
+}
+.hero__tenant::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--clear);}
+.hero__bell{
+  position:relative;width:44px;height:44px;border-radius:999px;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);
+  display:grid;place-items:center;color:#fff;
+}
+.hero__bell i{
+  position:absolute;top:-3px;right:-3px;min-width:20px;height:20px;padding:0 5px;
+  border-radius:999px;background:var(--halt);color:#fff;border:2px solid var(--panel);
+  font-family:var(--mono);font-size:10.5px;font-style:normal;font-weight:700;line-height:16px;text-align:center;
+}
+.hero__mark{margin-top:26px;display:flex;align-items:center;gap:12px;}
+.hero__word{
+  font-size:30px;font-weight:900;font-style:italic;letter-spacing:.04em;color:#fff;line-height:1;
+}
+.hero__word em{font-style:inherit;color:#7fa8ff;}
+.hero__claim{
+  margin:9px 0 0;font-size:var(--t-sm);font-weight:700;letter-spacing:.06em;color:var(--panel-ink);
+}
+
+.big{display:grid;grid-template-rows:1fr 1fr;gap:12px;padding:14px;flex:1;min-height:300px;}
+.bigcard{
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  padding:22px;border-radius:24px;background:var(--card);border:1px solid var(--line);text-align:center;
+  transition:transform .08s ease, border-color .15s ease;
+}
+.bigcard:active{transform:scale(.985);border-color:var(--signal);}
+.bigcard__ico{color:var(--ink);margin-bottom:6px;}
+.bigcard b{font-size:var(--t-h2);font-weight:900;letter-spacing:.02em;}
+.bigcard span{font-size:var(--t-sm);font-weight:700;color:var(--ink-3);}
+.bigcard .tag{position:absolute;top:14px;right:14px;}
+
+/* --------------------------------------------------------------- 停止タイマー */
+.halt{
+  flex:none;display:flex;align-items:center;gap:10px;padding:9px 16px;
+  background:var(--halt);color:#fff;
+}
+.halt__dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:blink 1.4s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.halt__t{font-size:var(--t-micro);font-weight:800;letter-spacing:.04em;}
+.halt__c{margin-left:auto;font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.02em;}
+
+/* --------------------------------------------------------------- 質問 */
+.steps{flex:none;padding:12px 16px 13px;background:var(--card);border-bottom:1px solid var(--line);}
+.segs{display:flex;gap:5px;}
+.segs span{flex:1;height:4px;border-radius:999px;background:var(--sunk);}
+.segs span[data-on="true"]{background:var(--signal);}
+.steps__m{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:9px;}
+.steps__m b{font-family:var(--mono);font-size:11.5px;font-weight:700;letter-spacing:.1em;color:var(--signal);}
+.steps__m span{
+  flex:1;min-width:0;text-align:right;font-size:var(--t-micro);font-weight:700;color:var(--ink-3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.q{margin:4px 0 0;font-size:calc(22px * var(--f));font-weight:900;line-height:1.6;text-wrap:balance;}
+.q-hint{margin:9px 0 0;font-size:var(--t-sm);font-weight:600;color:var(--ink-3);line-height:1.75;}
+.ans{
+  display:flex;align-items:center;gap:13px;width:100%;min-height:74px;padding:15px 17px;
+  border-radius:var(--r-ctl);background:var(--card);border:1.5px solid var(--line);text-align:left;
+  transition:transform .07s ease, border-color .15s ease, background .15s ease;
+}
+.ans:active{transform:scale(.99);border-color:var(--signal);background:var(--signal-soft);}
+.ans__dot{flex:none;width:21px;height:21px;border-radius:999px;border:2px solid var(--line);}
+.ans__l{flex:1;font-size:var(--t-lg);font-weight:800;line-height:1.5;}
+
+.trail{border-top:1px dashed var(--line);padding-top:10px;margin-top:8px;}
+.trail__t{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;font-size:var(--t-sm);font-weight:800;color:var(--signal);}
+.trail__t svg:last-child{margin-left:auto;transition:transform .18s ease;}
+.trail__t[data-open="true"] svg:last-child{transform:rotate(180deg);}
+.trail ol{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;}
+.trail li{padding-left:13px;border-left:2px solid var(--signal-line);}
+.trail li p{margin:0;font-size:var(--t-micro);font-weight:700;color:var(--ink-3);line-height:1.6;}
+.trail li button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:40px;text-align:left;}
+.trail li b{font-size:var(--t-sm);font-weight:800;}
+.trail li span{flex:none;font-size:var(--t-micro);font-weight:800;color:var(--signal);}
+
+/* --------------------------------------------------------------- 結果 */
+.cause{margin:2px 0 0;font-size:var(--t-h1);font-weight:900;line-height:1.5;text-wrap:balance;}
+.act{padding:17px 18px;}
+.act__h{
+  display:flex;align-items:center;gap:7px;margin-bottom:7px;
+  font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);
+}
+.act p{margin:0;font-size:var(--t-body);font-weight:600;line-height:1.95;color:var(--ink-2);}
+
+.vcard{display:block;border-radius:var(--r-card);overflow:hidden;background:var(--card);border:1px solid var(--line);}
+.vthumb{position:relative;aspect-ratio:16/9;background:linear-gradient(145deg,#2e4d80,#101725);}
+.vthumb canvas{position:absolute;inset:0;width:100%;height:100%;}
+.vplay{
+  position:absolute;inset:0;margin:auto;width:62px;height:62px;border-radius:999px;
+  background:rgba(255,255,255,.95);color:#12203a;display:grid;place-items:center;
+  box-shadow:0 8px 24px rgba(0,0,0,.3);
+}
+.vlen{
+  position:absolute;right:9px;bottom:9px;padding:2px 7px;border-radius:6px;
+  background:rgba(8,12,20,.78);color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;
+}
+.vcard__b{padding:13px 16px;}
+.vcard__b b{display:block;font-size:var(--t-body);font-weight:800;line-height:1.5;}
+.vcard__b span{display:block;margin-top:2px;font-size:var(--t-micro);font-weight:600;color:var(--ink-3);}
+
+.linkrow{
+  display:flex;align-items:center;gap:10px;min-height:52px;padding:0 15px;
+  border-radius:var(--r-ctl);background:var(--signal-soft);color:var(--signal);
+  font-size:var(--t-sm);font-weight:800;width:100%;text-align:left;
+}
+.linkrow svg:last-child{margin-left:auto;}
+
+/* --------------------------------------------------------------- シート */
+.sheet{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:flex-end;}
+.sheet__scrim{position:absolute;inset:0;background:rgba(8,12,20,.5);animation:fade .2s ease both;}
+.sheet__p{
+  position:relative;max-height:90%;display:flex;flex-direction:column;
+  background:var(--card);border-radius:26px 26px 0 0;
+  box-shadow:0 -10px 40px rgba(8,12,20,.3);animation:rise .26s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes rise{from{transform:translateY(18px);opacity:0}to{transform:none;opacity:1}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet__g{width:40px;height:4px;border-radius:999px;background:var(--line);margin:10px auto 2px;}
+.sheet__h{padding:10px 20px 2px;}
+.sheet__h h2{margin:9px 0 0;font-size:var(--t-h2);font-weight:900;line-height:1.5;text-wrap:balance;}
+.sheet__s{flex:1;overflow-y:auto;padding:14px 20px 6px;display:flex;flex-direction:column;gap:12px;}
+.sheet__a{display:flex;gap:10px;padding:12px 20px;padding-bottom:max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line);}
+.sheet__a .btn{flex:1;font-size:var(--t-body);}
+
+/* 定義リスト */
+.kv{margin:0;border:1px solid var(--line);border-radius:var(--r-ctl);overflow:hidden;}
+.kv>div{display:flex;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line);}
+.kv>div:last-child{border-bottom:none;}
+.kv dt{flex:none;width:88px;font-size:var(--t-micro);font-weight:800;color:var(--ink-3);}
+.kv dd{flex:1;min-width:0;margin:0;display:flex;align-items:center;gap:6px;font-size:var(--t-sm);font-weight:700;}
+
+/* 自動下書き */
+.draft{padding:15px 16px;border-radius:var(--r-ctl);background:var(--signal-soft);border:1px solid var(--signal-line);}
+.checks{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:7px;}
+.checks li{display:flex;align-items:flex-start;gap:8px;font-size:var(--t-sm);font-weight:700;line-height:1.7;}
+.checks svg{flex:none;margin-top:4px;color:var(--clear);}
+.draft p{margin:0;font-size:var(--t-sm);font-weight:600;line-height:1.9;color:var(--ink-2);}
+
+/* --------------------------------------------------------------- 機体グリッド */
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.mcard{
+  display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;
+  padding:12px 12px 15px;border-radius:var(--r-card);background:var(--card);border:1px solid var(--line);text-align:center;
+}
+.mcard:active{border-color:var(--signal);}
+.mcard b{font-family:var(--mono);font-size:var(--t-body);font-weight:700;letter-spacing:.02em;}
+.mcard>span{font-size:var(--t-micro);font-weight:700;color:var(--ink-3);}
+.mthumb{
+  position:relative;width:100%;aspect-ratio:5/3;border-radius:12px;background:var(--sunk);
+  display:grid;place-items:center;padding:10px;
+}
+.mthumb svg{width:100%;height:100%;}
+.mthumb i{
+  position:absolute;right:6px;bottom:4px;font-family:var(--mono);font-style:normal;
+  font-size:9px;font-weight:700;color:var(--ink-3);opacity:.65;
+}
+
+/* --------------------------------------------------------------- 動画 */
+.vrow{display:flex;align-items:center;gap:13px;padding:11px;border-radius:var(--r-card);background:var(--card);border:1px solid var(--line);width:100%;text-align:left;}
+.vrow:active{border-color:var(--signal);}
+.vrow__t{position:relative;flex:none;width:98px;aspect-ratio:16/10;border-radius:11px;overflow:hidden;background:linear-gradient(145deg,#2e4d80,#101725);display:grid;place-items:center;color:#fff;}
+.vrow__t i{position:absolute;right:4px;bottom:3px;font-family:var(--mono);font-style:normal;font-size:10px;font-weight:700;background:rgba(8,12,20,.75);padding:1px 5px;border-radius:5px;}
+.vrow__b{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;align-items:flex-start;}
+.vrow__b b{font-size:var(--t-body);font-weight:800;line-height:1.5;}
+.vrow__b span{font-size:var(--t-micro);font-weight:600;color:var(--ink-3);}
+
+.player{flex:none;background:var(--panel);}
+.pstage{position:relative;aspect-ratio:16/9;}
+.pstage canvas{position:absolute;inset:0;width:100%;height:100%;}
+.pquality{
+  position:absolute;left:10px;top:10px;padding:4px 9px;border-radius:999px;
+  background:rgba(8,12,20,.6);color:#dbe6f7;font-size:10.5px;font-weight:800;backdrop-filter:blur(4px);
+}
+.pbar{display:flex;align-items:center;gap:10px;padding:9px 14px;color:var(--panel-ink);}
+.pbar .num{font-size:11.5px;font-weight:700;}
+.ptrack{flex:1;height:3px;border-radius:999px;background:rgba(255,255,255,.2);overflow:hidden;}
+.ptrack i{display:block;height:100%;background:var(--signal);transition:width .3s ease;}
+.chapter{display:flex;align-items:center;gap:13px;width:100%;min-height:52px;padding:11px 16px;text-align:left;border-bottom:1px solid var(--line);}
+.chapter:last-child{border-bottom:none;}
+.chapter[data-on="true"]{background:var(--signal-soft);color:var(--signal);}
+.chapter .num{flex:none;width:40px;font-size:12px;font-weight:700;color:var(--signal);}
+.chapter b{flex:1;font-size:var(--t-sm);font-weight:700;line-height:1.5;}
+.vacts{display:flex;gap:10px;}
+.vact{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;min-height:48px;border-radius:var(--r-ctl);border:1.5px solid var(--line);background:var(--card);font-size:var(--t-sm);font-weight:800;color:var(--ink-2);}
+.vact[data-on="true"]{border-color:var(--clear);background:var(--clear-soft);color:var(--clear);}
+
+/* --------------------------------------------------------------- 記録 */
+.rec{display:block;width:100%;text-align:left;padding:14px 16px;border-radius:var(--r-card);background:var(--card);border:1px solid var(--line);}
+.rec:active{border-color:var(--signal);}
+.rec__top{display:flex;align-items:center;gap:8px;}
+.rec__id{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ink-3);}
+.rec__t{display:block;margin-top:7px;font-size:var(--t-lg);font-weight:900;line-height:1.5;}
+.rec__m{display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:3px;font-size:var(--t-micro);font-weight:700;color:var(--ink-3);}
+.rec__f{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:10px;border-top:1px dashed var(--line);}
+.rec__s{display:inline-flex;align-items:center;gap:4px;font-size:var(--t-micro);font-weight:800;color:var(--ink-3);}
+.rec__f svg:last-child{margin-left:auto;color:var(--ink-3);opacity:.6;}
+
+.fab{
+  position:absolute;right:16px;bottom:calc(74px + env(safe-area-inset-bottom));z-index:5;
+  display:flex;align-items:center;gap:8px;height:54px;padding:0 21px;border-radius:999px;
+  background:var(--signal);color:#fff;font-size:var(--t-body);font-weight:800;
+  box-shadow:0 10px 26px -6px color-mix(in srgb,var(--signal) 60%, transparent);
+}
+:root[data-theme="dark"] .fab{color:#0b0f16;}
+
+.auto>div{display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 14px;border-bottom:1px solid var(--line);}
+.auto>div:last-child{border-bottom:none;}
+.auto dt{flex:none;width:88px;font-size:var(--t-micro);font-weight:800;color:var(--ink-3);white-space:nowrap;}
+.auto dd{flex:1;min-width:0;margin:0;display:flex;align-items:center;gap:6px;font-size:var(--t-sm);font-weight:800;white-space:nowrap;}
+.auto dd em{font-style:normal;font-size:10.5px;font-weight:700;color:var(--ink-3);}
+.auto select{flex:1;min-width:0;height:44px;padding:0 9px;border-radius:11px;border:1.5px solid var(--line);background:var(--card);font-family:var(--mono);font-size:14px;font-weight:700;}
+.auto__ico{flex:none;width:44px;height:44px;border-radius:11px;background:var(--signal-soft);color:var(--signal);display:grid;place-items:center;}
+.auto__fix{
+  flex:none;display:inline-flex;align-items:center;gap:4px;height:38px;padding:0 14px;border-radius:999px;
+  border:1.5px solid var(--line);font-size:var(--t-micro);font-weight:800;color:var(--ink-2);
+}
+.auto__fix[data-on="true"]{border-color:var(--clear);background:var(--clear-soft);color:var(--clear);}
+
+.photos{display:flex;flex-wrap:wrap;gap:10px;}
+.photo-add{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  width:100px;height:100px;border-radius:var(--r-ctl);border:2px dashed var(--signal-line);
+  background:var(--signal-soft);color:var(--signal);font-size:var(--t-micro);font-weight:800;
+}
+.photo{position:relative;width:100px;height:100px;border-radius:var(--r-ctl);background:var(--sunk);color:var(--ink-3);display:grid;place-items:center;}
+.photo button{position:absolute;top:-6px;right:-6px;width:25px;height:25px;border-radius:999px;background:var(--ink);color:var(--paper);font-size:14px;font-weight:800;line-height:1;}
+
+.disclosure{
+  display:flex;align-items:center;gap:8px;width:100%;min-height:52px;padding:0 16px;
+  border-radius:var(--r-ctl);border:1.5px dashed var(--line);font-size:var(--t-sm);font-weight:800;color:var(--ink-2);
+}
+.disclosure svg:last-child{margin-left:auto;transition:transform .18s ease;}
+.disclosure[data-open="true"] svg:last-child{transform:rotate(180deg);}
+
+.toast{
+  display:flex;align-items:center;gap:10px;margin:12px 16px -4px;padding:12px 14px;
+  border-radius:var(--r-ctl);background:var(--clear-soft);color:var(--clear);
+  font-size:var(--t-sm);font-weight:800;animation:rise .24s ease both;
+}
+.toast button{margin-left:auto;font-size:var(--t-micro);font-weight:800;opacity:.75;}
+
+/* --------------------------------------------------------------- 資料集 */
+.topic-h{margin:0;font-size:var(--t-h1);font-weight:900;line-height:1.45;text-wrap:balance;}
+.toc{padding:13px 16px;border-radius:var(--r-ctl);background:var(--card);border:1px solid var(--line);}
+.toc b{
+  display:block;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:6px;
+}
+.toc a{display:block;min-height:38px;line-height:38px;font-size:var(--t-sm);font-weight:800;color:var(--signal);}
+.doc{display:flex;flex-direction:column;gap:13px;}
+.doc h2{margin:8px 0 0;font-size:var(--t-lg);font-weight:900;padding-left:11px;border-left:3px solid var(--signal);scroll-margin-top:12px;}
+.doc p{margin:0;font-size:var(--t-body);font-weight:600;line-height:2;color:var(--ink-2);}
+.doc ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;}
+.doc ol li{display:flex;gap:11px;padding:12px 14px;border-radius:var(--r-ctl);background:var(--card);border:1px solid var(--line);font-size:var(--t-body);font-weight:700;line-height:1.75;}
+.doc ol li span{flex:none;width:25px;height:25px;border-radius:999px;background:var(--signal);color:#fff;font-family:var(--mono);font-size:12px;font-weight:700;display:grid;place-items:center;}
+:root[data-theme="dark"] .doc ol li span{color:#0b0f16;}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-ctl);background:var(--card);}
+table{width:100%;border-collapse:collapse;font-size:var(--t-sm);}
+th,td{padding:10px 13px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap;}
+th{background:var(--sunk);font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);}
+tr:last-child td{border-bottom:none;}
+td:first-child{font-family:var(--mono);font-weight:700;}
+.figure{margin:0;}
+.figbox{
+  aspect-ratio:16/9;border-radius:var(--r-ctl);border:1px solid var(--line);
+  background:repeating-linear-gradient(45deg,var(--sunk),var(--sunk) 11px,var(--card) 11px,var(--card) 22px);
+  display:grid;place-items:center;font-size:var(--t-micro);font-weight:800;color:var(--ink-3);
+}
+.figure figcaption{margin-top:6px;font-size:var(--t-micro);font-weight:700;color:var(--ink-3);}
+.source{margin:8px 0 0;text-align:center;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--ink-3);}
+
+/* --------------------------------------------------------------- メニュー */
+.profile{display:flex;align-items:center;gap:13px;padding:16px;border-radius:var(--r-card);background:var(--panel);color:#fff;}
+.profile__a{width:50px;height:50px;border-radius:999px;background:rgba(126,166,255,.18);color:#8fb2ff;display:grid;place-items:center;}
+.profile b{display:block;font-size:var(--t-lg);font-weight:900;}
+.profile span{display:block;font-size:var(--t-micro);font-weight:700;color:var(--panel-ink);}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.stat{padding:13px 8px;border-radius:var(--r-ctl);background:var(--card);border:1px solid var(--line);text-align:center;}
+.stat b{display:block;font-family:var(--mono);font-size:var(--t-h2);font-weight:700;color:var(--signal);}
+.stat span{display:block;margin-top:2px;font-size:10.5px;font-weight:700;color:var(--ink-3);}
+.seg{display:flex;gap:4px;padding:4px;border-radius:12px;background:var(--sunk);}
+.seg button{flex:1;min-height:38px;border-radius:9px;font-size:var(--t-micro);font-weight:800;color:var(--ink-3);}
+.seg button[data-on="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(8,12,20,.12);}
+.version{margin:10px 0 0;text-align:center;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--ink-3);}
+
+/* お知らせ */
+.ncard{display:flex;gap:12px;padding:15px;border-radius:var(--r-card);background:var(--card);border:1px solid var(--line);}
+.ncard[data-unread="true"]{border-color:var(--signal-line);}
+.ncard__i{flex:none;width:38px;height:38px;border-radius:11px;background:var(--signal-soft);color:var(--signal);display:grid;place-items:center;}
+.ncard__b{flex:1;min-width:0;}
+.ncard__t{display:flex;align-items:flex-start;gap:8px;}
+.ncard__t b{flex:1;font-size:var(--t-body);font-weight:900;line-height:1.5;}
+.ndot{flex:none;width:8px;height:8px;margin-top:7px;border-radius:999px;background:var(--halt);}
+.ncard p{margin:4px 0 0;font-size:var(--t-sm);font-weight:600;line-height:1.75;color:var(--ink-2);}
+.ncard time{display:block;margin-top:7px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--ink-3);}
+
+.empty{text-align:center;padding:48px 24px;color:var(--ink-3);}
+.empty b{display:block;margin:10px 0 4px;font-size:var(--t-body);font-weight:800;color:var(--ink-2);}
+.empty p{margin:0;font-size:var(--t-sm);font-weight:600;}
+
+.anim{animation:rise .22s ease both;}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important;}
+}
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <aside class="rail" aria-label="画面一覧">
+    <div class="rail__brand">TOMA<i>RUN</i></div>
+    <p class="rail__tag">生産を、止めない。／ UIデモ</p>
+    <div id="rail"></div>
+    <p class="rail__note">実機の枠内はすべてタップで動きます。テーマと文字サイズはメニュー画面で切り替えられます。</p>
+  </aside>
+
+  <div class="device">
+    <div class="app" id="app">
+      <div id="chrome"></div>
+      <main class="view" id="view"></main>
+      <div id="dock"></div>
+      <nav class="tabs" id="tabs"></nav>
+      <div id="overlay"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   アイコン（すべてインライン。外部リクエストは一切なし）
+   ========================================================================== */
+const I = (d, o) => `<svg width="${(o&&o.s)||22}" height="${(o&&o.s)||22}" viewBox="0 0 24 24" fill="none"
+  stroke="currentColor" stroke-width="${(o&&o.w)||2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+
+const ICON = {
+  home:o=>I('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 10v10h14V10"/>',o),
+  record:o=>I('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',o),
+  book:o=>I('<path d="M3 5a2 2 0 0 1 2-2h5v18H5a2 2 0 0 1-2-2z"/><path d="M21 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2z"/>',o),
+  menu:o=>I('<path d="M4 7h16M4 12h16M4 17h16"/>',o),
+  bell:o=>I('<path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M10.5 20a2 2 0 0 0 3 0"/>',o),
+  gearsearch:o=>I('<path d="M10.2 2.6h3.6l.5 2.1 1.9.8 1.8-1.2 2.6 2.6-1.2 1.8.8 1.9 2.1.5v3.6l-2.1.5-.8 1.9 1.2 1.8-2.6 2.6-1.8-1.2-1.9.8-.5 2.1h-3.6l-.5-2.1-1.9-.8-1.8 1.2-2.6-2.6 1.2-1.8-.8-1.9-2.1-.5v-3.6l2.1-.5.8-1.9-1.2-1.8 2.6-2.6 1.8 1.2 1.9-.8z"/><circle cx="11.4" cy="11.4" r="4.1"/><path d="m14.6 14.6 3.1 3.1"/><path d="M11.4 9.2v2.6M11.4 13.5h.01"/>',o),
+  playgear:o=>I('<rect x="2.2" y="5" width="15.6" height="12" rx="3.2"/><path d="m8.6 9 4.4 2.6-4.4 2.6z"/><circle cx="18.2" cy="17.4" r="2.4"/><path d="M18.2 13.6v1.2M18.2 20v1.2M14.4 17.4h1.2M20.8 17.4H22M15.5 14.7l.9.9M20 19.2l.9.9M20.9 14.7l-.9.9M16.4 19.2l-.9.9"/>',o),
+  play:o=>I('<path d="M7 4.5 19 12 7 19.5z" fill="currentColor"/>',o),
+  left:o=>I('<path d="m14.5 5-7 7 7 7"/>',o),
+  right:o=>I('<path d="m9.5 5 7 7-7 7"/>',o),
+  down:o=>I('<path d="m5 9 7 7 7-7"/>',o),
+  check:o=>I('<path d="m4 12.5 5 5L20 6.5"/>',o),
+  search:o=>I('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',o),
+  camera:o=>I('<path d="M3 8.5a2 2 0 0 1 2-2h2.2l1.3-2h6l1.3 2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.4"/>',o),
+  mic:o=>I('<rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/>',o),
+  spark:o=>I('<path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9z"/><path d="M18.5 3v3M20 4.5h-3"/>',o),
+  qr:o=>I('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM20 14v3M17 20h4M14 20h.01"/>',o),
+  alert:o=>I('<path d="M12 3.5 22 20H2z"/><path d="M12 10v4M12 17h.01"/>',o),
+  star:o=>I('<path d="m12 3.8 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 10l5.9-.9z"/>',o),
+  starOn:o=>I('<path d="m12 3.8 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 10l5.9-.9z" fill="currentColor"/>',o),
+  clock:o=>I('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',o),
+  offline:o=>I('<path d="M3 3l18 18"/><path d="M6.5 11.5a7 7 0 0 1 3-2.2M2.5 8.5a12 12 0 0 1 4-2.7M17.5 11.5a7 7 0 0 0-2.4-1.9M21.5 8.5a12 12 0 0 0-5.8-3.2M9.5 15a4 4 0 0 1 5 0M12 19h.01"/>',o),
+  down2:o=>I('<path d="M12 3.5v11M7.5 10.5 12 15l4.5-4.5M4 19.5h16"/>',o),
+  pdf:o=>I('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 17v-3.5h1.2a1.2 1.2 0 0 1 0 2.4H8.5M13 17v-3.5h1.4a1.7 1.7 0 0 1 0 3.5z"/>',o),
+  share:o=>I('<path d="M12 15V3.5M8 7l4-3.5L16 7"/><path d="M5 13v6.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V13"/>',o),
+  plus:o=>I('<path d="M12 5v14M5 12h14"/>',o),
+  gauge:o=>I('<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-5"/>',o),
+  user:o=>I('<circle cx="12" cy="8" r="3.8"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>',o),
+  wifi:o=>I('<path d="M2.5 8.5a14 14 0 0 1 19 0M6 12a9 9 0 0 1 12 0M9.5 15.5a4 4 0 0 1 5 0M12 19h.01"/>',o),
+  battery:o=>I('<rect x="2" y="7" width="17" height="10" rx="3"/><path d="M21.5 11v2"/><rect x="4.5" y="9.5" width="11" height="5" rx="1.5" fill="currentColor" stroke="none"/>',o),
+  machine:()=>`<svg viewBox="0 0 120 72" fill="none" aria-hidden="true">
+    <rect x="6" y="24" width="42" height="36" rx="3" fill="currentColor" opacity=".22"/>
+    <rect x="12" y="30" width="19" height="13" rx="2" fill="currentColor" opacity=".42"/>
+    <rect x="12" y="47" width="30" height="4" rx="2" fill="currentColor" opacity=".42"/>
+    <rect x="53" y="14" width="61" height="46" rx="3" fill="currentColor" opacity=".3"/>
+    <circle cx="71" cy="35" r="8.5" fill="currentColor" opacity=".45"/>
+    <circle cx="95" cy="35" r="5.5" fill="currentColor" opacity=".45"/>
+    <rect x="53" y="8" width="61" height="6" rx="3" fill="currentColor" opacity=".36"/>
+    <rect x="2" y="60" width="116" height="6" rx="3" fill="currentColor" opacity=".3"/>
+  </svg>`
+};
+
+/* ==========================================================================
+   データ（すべてモック。実装時はテナント単位のAPIから取得）
+   ========================================================================== */
+const TENANT = { name:"フライハイト検証工場", user:"徳田 菜摘", role:"現場作業者" };
+
+const MACHINES = [
+  {id:"mr100", name:"MR100", serial:"SA20001", cat:"印刷・加工機", trees:4, videos:12},
+  {id:"mc100", name:"MC100", serial:"SA20014", cat:"成形機", trees:3, videos:8},
+  {id:"cn1000", name:"CN1000", serial:"SB10022", cat:"マシニングセンタ", trees:0, videos:6},
+  {id:"cm125", name:"CM125", serial:"SB10045", cat:"研削盤", trees:0, videos:4},
+  {id:"fil100", name:"FiL100", serial:"SC30007", cat:"レーザー加工機", trees:1, videos:5},
+  {id:"lq10", name:"LQ10", serial:"SC30019", cat:"射出成形機", trees:0, videos:3},
+  {id:"mx2000", name:"MX2000", serial:"SD40002", cat:"旋盤", trees:2, videos:7},
+  {id:"gr12", name:"GR12", serial:"SD40031", cat:"粉砕機", trees:0, videos:2}
+];
+const machine = id => MACHINES.find(m => m.id === id);
+
+const TREES = [{
+  id:"dpf", machineId:"mr100", title:"DPFサービスルーチン未完了（差圧異常）",
+  codes:["KWP809","KWP810"], version:"公開版 v1", depth:3, updated:"2026/07/12", root:"q1",
+  nodes:{
+    q1:{id:"q1", q:"診断機Serdiaで確認した際、KWP809およびKWP810のエラーコードが検出されましたか？",
+        hint:"診断機を接続し、故障コード一覧を表示してください",
+        a:[{l:"KWP809/810を検出した", n:"q2"},{l:"KWP809/810以外のエラーを検出した", n:"r-other"}]},
+    q2:{id:"q2", q:"DPF差圧データは通常の動作範囲を超えていますか？",
+        hint:"Serdiaの実測データ画面で差圧値を確認",
+        a:[{l:"はい、範囲を超えている", n:"q3"},{l:"いいえ、範囲内である", n:"r-wire"}]},
+    q3:{id:"q3", q:"EGR配管の詰まりは確認済みですか？",
+        hint:"配管を取り外し、内部の堆積物を目視で確認",
+        a:[{l:"確認済みで異常なし", n:"r-sensor"},{l:"未確認", n:"r-check"},{l:"詰まりを確認した", n:"r-egr"}]}
+  },
+  results:{
+    "r-sensor":{cause:"DPF差圧センサーの故障",
+      act:"EGR配管に異常がないため、DPF差圧センサーの故障が原因の可能性があります。エンジンを停止し電源を遮断した上でDPF差圧センサーを交換してください。交換後、Serdiaにて再度DPFサービスルーチンを実行し、エラーが解消され正常完了することを確認してください。",
+      draft:"DPF差圧センサーを交換。交換後、診断機で再度サービスルーチンを実行し、エラーが解消され正常完了することを確認した。",
+      video:"v-sensor", record:"2026-010", topic:"t-codes"},
+    "r-egr":{cause:"EGR配管の詰まり",
+      act:"EGR配管の堆積物が差圧異常の原因です。配管を取り外して洗浄し、再組付け後にDPFサービスルーチンを実行してください。堆積が著しい場合はEGRクーラーの点検も併せて実施してください。",
+      draft:"EGR配管を取り外して洗浄し、再組付け後にDPFサービスルーチンを実行して正常完了することを確認した。",
+      video:"v-egr", topic:"t-egr"},
+    "r-check":{cause:"EGR配管の確認が未実施",
+      act:"先にEGR配管の詰まりを確認してください。動画マニュアルの手順に従って配管を取り外し、内部の堆積状況を目視で確認した上で、このトラブルシューティングをやり直してください。",
+      draft:"EGR配管の確認が未実施のため、動画マニュアルの手順に沿って確認を行うこととした。",
+      video:"v-egr"},
+    "r-wire":{cause:"差圧センサー配線の接触不良",
+      act:"差圧値が正常範囲であるにもかかわらずエラーが出る場合、センサー配線のコネクタ接触不良や断線が疑われます。コネクタの緩み・腐食・ハーネスの擦れを点検してください。改善しない場合はメーカーへ連絡してください。",
+      draft:"差圧センサーのコネクタと配線を点検し、接触不良を修正した。", topic:"t-codes"},
+    "r-other":{cause:"別系統のエラー",
+      act:"KWP809/810以外のエラーコードが出ている場合は、資料集のエラーコード一覧から該当コードを検索してください。該当のトラブルシューティングがない場合は対応記録を起票してメーカーへ共有してください。",
+      draft:"該当するツリーがないため、資料集のエラーコード一覧を確認した上でメーカーへ共有した。", topic:"t-codes"}
+  }
+}];
+const tree = id => TREES.find(t => t.id === id);
+
+const VIDEOS = [
+  {id:"v-sensor", machineId:"mr100", part:"エンジン・排気系", title:"DPF差圧センサーの交換手順", len:"4:32", updated:"2026/06/28", saved:true,
+   sum:"電源遮断からセンサー交換、サービスルーチン再実行までを一本で解説します。",
+   ch:[["0:00","安全確認と電源遮断"],["0:48","カバーの取り外し"],["1:35","差圧センサーの取り外し"],["2:40","新品センサーの取り付け"],["3:25","サービスルーチンの再実行"]]},
+  {id:"v-egr", machineId:"mr100", part:"エンジン・排気系", title:"EGR配管の取り外しと洗浄", len:"6:10", updated:"2026/06/14", saved:false,
+   sum:"配管の脱着と堆積物の洗浄方法、再組付け時の締付トルクまで。",
+   ch:[["0:00","必要な工具"],["0:55","配管の取り外し"],["2:30","堆積物の洗浄"],["4:40","再組付けと締付トルク"]]},
+  {id:"v-daily", machineId:"mr100", part:"日常点検", title:"始業前点検の手順", len:"3:05", updated:"2026/05/30", saved:true,
+   sum:"毎朝の点検項目を順番どおりに確認できます。",
+   ch:[["0:00","外観・漏れの確認"],["1:10","油量・冷却水の確認"],["2:05","安全装置の作動確認"]]},
+  {id:"v-roller", machineId:"mr100", part:"駆動・ローラー部", title:"ローラーベアリングの交換", len:"8:44", updated:"2026/04/18", saved:false,
+   sum:"異音発生時のベアリング交換手順と、交換後の振動値の確認方法。",
+   ch:[["0:00","異音の切り分け"],["1:20","ローラーの取り外し"],["3:50","ベアリング圧入"],["6:30","試運転と振動値確認"]]},
+  {id:"v-hyd", machineId:"mr100", part:"油圧ユニット", title:"油圧ユニットの圧力調整", len:"5:20", updated:"2026/03/22", saved:false,
+   sum:"圧力が上がらない場合のリリーフ弁調整とエア抜き。",
+   ch:[["0:00","圧力計の確認"],["1:15","リリーフ弁の調整"],["3:30","エア抜き"]]}
+];
+const video = id => VIDEOS.find(v => v.id === id);
+
+let RECORDS = [
+  {id:"2026-014", mid:"mr100", m:"MR100（SA20001）", t:"DPF差圧センサー交換", kind:"トラブル対応", genre:"機械系", cause:"破損",
+   at:"2026/07/27 15:26", fixed:"2026/07/27 16:12", down:46, who:"徳田 菜摘", hm:1412, st:"done",
+   from:"DPFサービスルーチン未完了（差圧異常）", photos:2,
+   checks:["エラーコード KWP809/810 の検出を確認","DPF差圧データが動作範囲を超過していることを確認","EGR配管の詰まりがないことを確認"],
+   body:"上記を確認した上で、DPF差圧センサーを交換。交換後、診断機で再度サービスルーチンを実行し、エラーが解消され正常完了することを確認した。"},
+  {id:"2026-013", mid:"mx2000", m:"MX2000（SD40002）", t:"主軸から異音・E-310で停止", kind:"トラブル対応", genre:"機械系", cause:"摩耗",
+   at:"2026/07/24 09:05", fixed:"2026/07/24 11:40", down:155, who:"村上 拓真", hm:8890, st:"shared", photos:3,
+   body:"加工中に主軸から異音、E-310表示で停止。手回しで確認しゴロつきあり、ベアリング周辺の温度上昇も確認。ベアリングを交換し、試運転で振動値が基準内に収まることを確認した。"},
+  {id:"2026-012", mid:"mr100", m:"MR100（SA20001）", t:"始業前点検", kind:"点検", genre:"定期点検", cause:"―",
+   at:"2026/07/24 08:10", who:"徳田 菜摘", hm:1398, st:"done", photos:0,
+   body:"始業前点検を実施。油量・冷却水・安全装置の作動、いずれも異常なし。"},
+  {id:"2026-011", mid:"fil100", m:"FiL100（SC30007）", t:"集塵ファンの風量低下", kind:"トラブル対応", genre:"機械系", cause:"未分類",
+   at:"2026/07/23 14:02", who:"村上 拓真", hm:4120, st:"draft", photos:2, body:""},
+  {id:"2026-010", mid:"mr100", m:"MR100（SA20001）", t:"DPF再生が完了しない", kind:"トラブル対応", genre:"機械系", cause:"詰まり",
+   at:"2026/06/30 13:48", fixed:"2026/06/30 15:30", down:102, who:"石田 遼", hm:1290, st:"done", photos:4,
+   body:"DPF再生が途中で停止。EGR配管に堆積物を確認したため洗浄を実施。再組付け後にサービスルーチンを実行し正常完了を確認した。"}
+];
+const record = id => RECORDS.find(r => r.id === id);
+const ST = {done:["完了","tag--clear"], shared:["メーカー共有済み","tag--signal"], draft:["未完了","tag--caution"]};
+
+const CAUSES = ["摩耗","破損","詰まり","電気系","油圧系","操作起因","その他"];
+const KINDS = ["トラブル対応","点検","部品交換","調整"];
+const PHRASES = ["異音が発生した","エラー表示で停止した","部品を交換した","清掃・洗浄した","増し締め・調整した","試運転で正常を確認した"];
+
+const TOPICS = [
+  {id:"t-codes", ch:"エラー対応", title:"エラーコード一覧（KWP系）", sum:"診断機に表示されるKWP系エラーコードの意味と一次対応。",
+   tags:["エラーコード","診断機","Serdia"], codes:["KWP809","KWP810","KWP812"], ed:"元取説 第4版に基づく", fav:true, off:true,
+   video:"v-sensor", tree:"dpf",
+   blocks:[
+     {t:"p", b:"診断機Serdiaを接続して読み出せるエラーコードのうち、DPF・EGR系統に関するものを示します。コードは複数同時に検出される場合があります。"},
+     {t:"table", head:["コード","内容","一次対応"], rows:[["KWP809","DPF差圧 上限超過","差圧センサー・EGR配管の確認"],["KWP810","DPFサービスルーチン未完了","ルーチンの再実行"],["KWP812","排気温度センサー異常","配線・コネクタの点検"]]},
+     {t:"halt", l:"危険", b:"エンジン停止直後は排気系が高温です。冷却を待たずに触れると重度の火傷を負うおそれがあります。必ず十分に冷えてから作業してください。"},
+     {t:"caution", l:"注意", b:"エラーコードを消去する前に、必ず発生時のデータを記録してください。消去すると原因追究に必要な情報が失われます。"}
+   ]},
+  {id:"t-daily", ch:"日常点検", title:"日常点検の手順", sum:"始業前に確認する項目を順番に示します。所要およそ5分。",
+   tags:["点検","始業前","日常"], codes:[], ed:"元取説 第4版に基づく", fav:true, off:true, video:"v-daily",
+   blocks:[
+     {t:"h", b:"点検の前に"},
+     {t:"p", b:"点検は必ず機械を停止し、主電源を切った状態で行ってください。可動部に手を入れる場合は電源のロックアウトを実施します。"},
+     {t:"h", b:"手順"},
+     {t:"steps", items:["外観を確認し、油漏れ・水漏れがないことを確認する","作動油タンクの油量がゲージの上下限の間にあることを確認する","冷却水量を確認し、不足していれば補給する","非常停止ボタンを押し、確実に停止することを確認する","安全カバーのインターロックが機能することを確認する"]},
+     {t:"caution", l:"注意", b:"非常停止の作動確認は、周囲に人がいないことを確認してから行ってください。"},
+     {t:"fig", b:"図1: 作動油ゲージの位置"}
+   ]},
+  {id:"t-egr", ch:"調整・整備", title:"EGR配管の清掃", sum:"堆積物による差圧異常が出た場合の清掃方法。",
+   tags:["EGR","清掃","差圧"], codes:["KWP809"], ed:"元取説 第4版に基づく", fav:false, off:false, video:"v-egr", tree:"dpf",
+   blocks:[
+     {t:"halt", l:"危険", b:"作業前に必ず主電源を遮断し、排気系が常温まで下がっていることを確認してください。"},
+     {t:"h", b:"必要な工具"},
+     {t:"p", b:"12mm・14mmスパナ、トルクレンチ、専用洗浄剤、ウエス。"},
+     {t:"h", b:"手順"},
+     {t:"steps", items:["クランプを緩め、EGR配管を機体から取り外す","配管内部の堆積物を専用洗浄剤で除去する","内部を目視し、貫通していることを確認する","ガスケットを新品に交換して組み付ける","締付トルク 25N・m で固定する"]},
+     {t:"caution", l:"注意", b:"ガスケットは再使用しないでください。排気漏れの原因になります。"}
+   ]},
+  {id:"t-hyd", ch:"調整・整備", title:"油圧ユニットの調整方法", sum:"圧力が規定値まで上がらない場合の調整手順。",
+   tags:["油圧","調整","圧力"], codes:[], ed:"元取説 第4版に基づく", fav:false, off:false, video:"v-hyd",
+   blocks:[
+     {t:"h", b:"規定値"},
+     {t:"table", head:["項目","規定値"], rows:[["主回路圧力","13.5 MPa ± 0.5"],["パイロット圧","3.5 MPa ± 0.2"],["作動油温度","35〜55 ℃"]]},
+     {t:"h", b:"手順"},
+     {t:"steps", items:["作動油温度が35℃以上になるまで暖機運転する","圧力計を主回路のチェックポートに接続する","リリーフ弁のロックナットを緩める","調整ねじを回して規定値に合わせる","ロックナットを締め、再度圧力を確認する"]}
+   ]},
+  {id:"t-spec", ch:"仕様・諸元", title:"主要諸元", sum:"本機の基本仕様。", tags:["仕様","諸元"], codes:[], ed:"元取説 第4版に基づく", fav:false, off:false,
+   blocks:[{t:"table", head:["項目","仕様"], rows:[["電源","三相 200V 50/60Hz"],["最大加工幅","1,000 mm"],["質量","3,200 kg"],["作動油","ISO VG46"]]}]}
+];
+const topic = id => TOPICS.find(t => t.id === id);
+
+const NOTICES = [
+  {k:"tree", t:"新しいトラブルシューティングが3件公開されました", b:"先週の対応記録から自動生成され、メーカーの承認を経て公開されました。MR100 / MX2000 が対象です。", at:"今日 07:00", unread:true},
+  {k:"video", t:"動画マニュアルを1件追加しました", b:"MR100「DPF差圧センサーの交換手順」にチャプターが追加されました。", at:"昨日 18:20", unread:true},
+  {k:"doc", t:"資料集を改訂しました（第4版）", b:"「エラーコード一覧（KWP系）」の項目が差し替えられました。", at:"7/25 11:05", unread:false},
+  {k:"sys", t:"オフライン保存の同期が完了しました", b:"お気に入りの項目3件と動画2件を端末に保存しました。", at:"7/24 08:02", unread:false}
+];
+
+/* ==========================================================================
+   状態と画面遷移
+   ========================================================================== */
+const S = {
+  screen:"home", p:{}, stack:[],
+  // トラブルシューティング
+  cursor:null, answers:[], trailOpen:false, sheet:false, haltStart:null, elapsedMs:0,
+  // 動画
+  part:"すべて", chapter:0, savedOverride:{},
+  // 記録
+  filter:"すべて", toast:false,
+  form:{ mid:"mr100", cause:"", phrases:[], body:"", photos:0, hmFixed:false, detail:false, kind:"トラブル対応", ai:false },
+  // 資料集
+  query:"", favOverride:{},
+  // 設定
+  size:"標準"
+};
+
+const el = {
+  chrome: document.getElementById("chrome"),
+  view:   document.getElementById("view"),
+  dock:   document.getElementById("dock"),
+  tabs:   document.getElementById("tabs"),
+  overlay:document.getElementById("overlay"),
+  rail:   document.getElementById("rail"),
+  app:    document.getElementById("app")
+};
+
+const TABS = [
+  {k:"home",    label:"ホーム",  icon:"home",   is:s => s === "home"},
+  {k:"records", label:"記録",    icon:"record", is:s => s.startsWith("record")},
+  {k:"docs",    label:"資料集",  icon:"book",   is:s => s.startsWith("doc")},
+  {k:"menu",    label:"メニュー",icon:"menu",   is:s => s === "menu"}
+];
+
+const RAIL = [
+  ["現場の入口", [["home","ホーム"],["notices","お知らせ"]]],
+  ["トラブルシュート", [["ts","機体を選択"],["ts-list","症状を選択"],["ts-run","分岐ツリー"],["ts-result","推奨処置"]]],
+  ["動画マニュアル", [["videos","機種を選択"],["video-list","動画一覧"],["player","プレイヤー"]]],
+  ["記録", [["records","記録一覧"],["record-new","起票（1画面）"],["record","記録の詳細"]]],
+  ["資料集・設定", [["docs","資料集"],["topic","項目の詳細"],["menu","メニュー"]]]
+];
+
+function go(screen, p){
+  if(S.screen !== screen) S.stack.push({screen:S.screen, p:S.p});
+  S.screen = screen; S.p = p || {};
+  onEnter();
+  render();
+  el.view.scrollTop = 0;
+}
+function back(){
+  const prev = S.stack.pop();
+  if(prev){ S.screen = prev.screen; S.p = prev.p; } else { S.screen = "home"; S.p = {}; }
+  onEnter(); render();
+}
+function jump(screen){ // レールからの直接ジャンプ（デモ用に代表的な引数を入れる）
+  const preset = {
+    "ts-list":{mid:"mr100"},
+    "ts-run":{mid:"mr100", tid:"dpf"},
+    "ts-result":{mid:"mr100", tid:"dpf"},
+    "video-list":{mid:"mr100"},
+    "player":{mid:"mr100", vid:"v-sensor"},
+    "record":{id:"2026-014"},
+    "topic":{id:"t-daily"}
+  }[screen] || {};
+  S.stack = []; S.screen = screen; S.p = preset;
+  if(screen === "ts-run"){ S.cursor = "q1"; S.answers = []; }
+  if(screen === "ts-result"){ // 代表の結果まで進めた状態を作る
+    const t = tree("dpf");
+    S.answers = [
+      {id:"q1", q:t.nodes.q1.q, l:"KWP809/810を検出した"},
+      {id:"q2", q:t.nodes.q2.q, l:"はい、範囲を超えている"},
+      {id:"q3", q:t.nodes.q3.q, l:"確認済みで異常なし"}
+    ];
+    S.cursor = "r-sensor"; S.screen = "ts-run";
+  }
+  onEnter(); render(); el.view.scrollTop = 0;
+}
+
+let ticker = null;
+function onEnter(){
+  clearInterval(ticker); ticker = null;
+  if(S.screen === "ts-run"){
+    if(S.haltStart === null) S.haltStart = Date.now();
+    ticker = setInterval(() => {
+      const isResult = S.cursor && S.cursor.startsWith("r-");
+      if(!isResult) S.elapsedMs = Date.now() - S.haltStart;
+      const c = document.getElementById("haltclock");
+      if(c) c.textContent = mmss(S.elapsedMs);
+    }, 1000);
+    S.elapsedMs = Date.now() - S.haltStart;
+  } else {
+    S.haltStart = null; S.elapsedMs = 0; S.sheet = false;
+  }
+}
+const mmss = ms => {
+  const s = Math.floor(ms/1000);
+  return String(Math.floor(s/60)).padStart(2,"0") + ":" + String(s%60).padStart(2,"0");
+};
+
+/* ==========================================================================
+   共通パーツ
+   ========================================================================== */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const bar = (title, sub, act) => `
+  <header class="bar">
+    <button class="bar__back" data-back aria-label="戻る">${ICON.left()}</button>
+    <div class="bar__t"><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ""}</div>
+    ${act || ""}
+  </header>`;
+const tabBar = (title, sub) => `
+  <header class="bar">
+    <div class="bar__t" style="padding-left:4px"><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ""}</div>
+  </header>`;
+const statusbar = onPanel => `
+  <div class="statusbar ${onPanel ? "statusbar--onpanel" : ""}">
+    <span>15:26</span>
+    <span class="statusbar__right">${ICON.wifi({s:15,w:2})}${ICON.battery({s:17,w:1.6})}</span>
+  </div>`;
+
+function unread(){ return NOTICES.filter(n => n.unread).length; }
+
+/* ==========================================================================
+   画面
+   ========================================================================== */
+const SCREENS = {};
+
+/* ------------------------------------------------------------------ ホーム */
+SCREENS.home = () => ({
+  chrome:"",
+  view:`
+    <div class="hero">
+      <canvas data-hero width="800" height="440"></canvas>
+      ${statusbar(true)}
+      <div class="hero__in">
+        <div class="hero__top">
+          <span class="hero__tenant">${esc(TENANT.name)}</span>
+          <button class="hero__bell" data-go="notices" aria-label="お知らせ ${unread()}件">
+            ${ICON.bell()}${unread() ? `<i>${unread()}</i>` : ""}
+          </button>
+        </div>
+        <div class="hero__mark">
+          <span class="hero__word">TOMA<em>RUN</em></span>
+        </div>
+        <p class="hero__claim">生産を、止めない。</p>
+      </div>
+    </div>
+
+    <div class="big">
+      <button class="bigcard" data-go="ts">
+        <span class="bigcard__ico">${ICON.gearsearch({s:46,w:1.5})}</span>
+        <b>トラブルシューティング</b>
+        <span>機械が止まったとき</span>
+        <span class="tag tag--caution">中断中 1件</span>
+      </button>
+      <button class="bigcard" data-go="videos">
+        <span class="bigcard__ico">${ICON.playgear({s:46,w:1.5})}</span>
+        <b>動画マニュアル</b>
+        <span>やり方を動画で見る</span>
+      </button>
+    </div>`,
+  dock:""
+});
+
+/* ---------------------------------------------------------------- お知らせ */
+SCREENS.notices = () => ({
+  chrome: statusbar() + bar("お知らせ", `未読 ${unread()}件`),
+  view:`<div class="pad">
+    ${NOTICES.map(n => `
+      <article class="ncard" data-unread="${n.unread}">
+        <span class="ncard__i">${n.k === "tree" ? ICON.gearsearch({s:19}) : n.k === "video" ? ICON.playgear({s:19}) : n.k === "doc" ? ICON.book({s:19}) : ICON.offline({s:19})}</span>
+        <div class="ncard__b">
+          <div class="ncard__t"><b>${esc(n.t)}</b>${n.unread ? '<span class="ndot"></span>' : ""}</div>
+          <p>${esc(n.b)}</p>
+          <time class="num">${esc(n.at)}</time>
+          ${n.k === "tree" ? `<button class="linkrow" style="margin-top:10px" data-go="ts">公開されたツリーを見る${ICON.right({s:18})}</button>` : ""}
+        </div>
+      </article>`).join("")}
+  </div>`
+});
+
+/* ------------------------------------------------- トラブルシュート: 機体 */
+SCREENS.ts = () => ({
+  chrome: statusbar() + bar("トラブルシュート", "機体を選択"),
+  view:`<div class="pad">
+    <div style="display:flex;gap:10px">
+      <label class="search" style="flex:1">
+        ${ICON.search()}<input placeholder="機種名・製番で探す" aria-label="機種を検索">
+      </label>
+      <button class="btn btn--primary" style="width:56px;flex:none;padding:0" aria-label="QRコードで機体を特定">${ICON.qr()}</button>
+    </div>
+    <p class="lead">機械に貼られたQRコードを読み取ると、機体をすぐに特定できます。</p>
+    <div class="grid2">
+      ${MACHINES.map(m => `
+        <button class="mcard" data-go="ts-list" data-mid="${m.id}">
+          <span class="mthumb">${ICON.machine()}<i>${m.name}</i></span>
+          <b>${m.name}</b><span>${esc(m.cat)}</span>
+          <span class="tag ${m.trees ? "tag--signal" : "tag--mute"}">ツリー ${m.trees}件</span>
+        </button>`).join("")}
+    </div>
+  </div>`
+});
+
+/* ------------------------------------------------- トラブルシュート: 症状 */
+SCREENS["ts-list"] = () => {
+  const m = machine(S.p.mid);
+  const list = TREES.filter(t => t.machineId === m.id);
+  return {
+    chrome: statusbar() + bar(m.name, `${m.serial} ・ 症状を選択`),
+    view:`<div class="pad">
+      <div class="label"><span>症状・エラーコードから選ぶ</span><em>${list.length}件</em></div>
+      ${list.length ? list.map(t => `
+        <button class="card card--pad" style="text-align:left;width:100%" data-go="ts-run" data-mid="${m.id}" data-tid="${t.id}">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:11px">
+            <span class="row__ico" style="background:var(--halt-soft);color:var(--halt)">${ICON.alert({s:20})}</span>
+            <b style="flex:1;font-size:var(--t-lg);font-weight:900;line-height:1.5">${esc(t.title)}</b>
+            ${ICON.right({s:18})}
+          </div>
+          <div class="chips">
+            ${t.codes.map(c => `<span class="tag tag--code">${c}</span>`).join("")}
+            <span class="tag tag--mute">STEP ${t.depth}問</span>
+          </div>
+          <p class="lead num" style="margin-top:11px;font-size:11.5px">${t.version}・${t.updated} 更新</p>
+        </button>`).join("") : `
+        <div class="empty">${ICON.alert({s:42})}<b>この機体のツリーはまだありません</b>
+          <p>対応記録を残すと、その内容からトラブルシューティングが自動生成されます。</p></div>`}
+      <button class="row list" style="margin-top:6px" data-go="record-new">
+        <span class="row__ico">${ICON.record({s:19})}</span>
+        <span class="row__b"><b>当てはまる症状がない</b><p>対応記録を起票して、メーカーに共有する</p></span>
+        ${ICON.right({s:18})}
+      </button>
+    </div>`
+  };
+};
+
+/* ------------------------------------------- トラブルシュート: 質問・結果 */
+SCREENS["ts-run"] = () => {
+  const m = machine(S.p.mid), t = tree(S.p.tid);
+  const node = t.nodes[S.cursor];
+
+  if(node){
+    const step = S.answers.length + 1;
+    return {
+      chrome: statusbar() + bar("トラブルシュート", `${m.name}・${t.version}`) + `
+        <div class="halt">
+          <span class="halt__dot"></span>
+          <span class="halt__t">停止中 ― 原因を特定しています</span>
+          <span class="halt__c num" id="haltclock">${mmss(S.elapsedMs)}</span>
+        </div>
+        <div class="steps">
+          <div class="segs">${Array.from({length:t.depth}, (_,i) => `<span data-on="${i <= S.answers.length}"></span>`).join("")}</div>
+          <div class="steps__m"><b>STEP ${step} / ${t.depth}</b><span>${esc(t.title)}</span></div>
+        </div>`,
+      view:`<div class="pad anim">
+        <h1 class="q">${esc(node.q)}</h1>
+        ${node.hint ? `<p class="q-hint">${esc(node.hint)}</p>` : ""}
+        <div style="display:flex;flex-direction:column;gap:11px;margin-top:6px">
+          ${node.a.map((a,i) => `
+            <button class="ans" data-answer="${i}"><span class="ans__dot"></span>
+              <span class="ans__l">${esc(a.l)}</span>${ICON.right({s:18})}</button>`).join("")}
+        </div>
+        ${S.answers.length ? `
+          <div class="trail">
+            <button class="trail__t" data-trail data-open="${S.trailOpen}" aria-expanded="${S.trailOpen}">
+              ${ICON.check({s:17})}これまでの回答 ${S.answers.length}件${ICON.down({s:17})}
+            </button>
+            ${S.trailOpen ? `<ol>${S.answers.map((a,i) => `
+              <li><p>${esc(a.q)}</p>
+                <button data-rewind="${i}"><b>${esc(a.l)}</b><span>選び直す</span></button></li>`).join("")}</ol>` : ""}
+          </div>` : ""}
+      </div>`,
+      dock:`<div class="dock">
+        <button class="btn btn--ghost" data-undo>戻る</button>
+        <button class="btn btn--soft" data-go="home">中断して保存</button>
+      </div>`
+    };
+  }
+
+  /* 結果 */
+  const r = t.results[S.cursor];
+  const v = r.video ? video(r.video) : null;
+  const tp = r.topic ? topic(r.topic) : null;
+  const mins = Math.max(1, Math.round(S.elapsedMs / 60000));
+
+  return {
+    chrome: statusbar() + bar("推奨される処置", `${m.name}・所要 ${mins}分`),
+    view:`<div class="pad anim">
+      <span class="tag tag--signal" style="align-self:flex-start">考えられる原因</span>
+      <h1 class="cause">${esc(r.cause)}</h1>
+      <div class="card act">
+        <div class="act__h">${ICON.alert({s:15})}recommended action</div>
+        <p>${esc(r.act)}</p>
+      </div>
+      ${v ? `
+        <button class="vcard" data-go="player" data-mid="${m.id}" data-vid="${v.id}">
+          <div class="vthumb"><canvas data-film width="640" height="360"></canvas>
+            <span class="vplay">${ICON.play({s:24})}</span><span class="vlen">${v.len}</span></div>
+          <div class="vcard__b" style="text-align:left">
+            <b>${esc(v.title)}</b><span>タップで再生・チャプターから手順へジャンプ</span></div>
+        </button>` : ""}
+      ${r.record ? `<button class="linkrow" data-go="record" data-id="${r.record}">${ICON.record({s:17})}過去の対応記録を見る（#${r.record}）${ICON.right({s:17})}</button>` : ""}
+      ${tp ? `<button class="linkrow" data-go="topic" data-id="${tp.id}">${ICON.book({s:17})}${esc(tp.title)}を開く${ICON.right({s:17})}</button>` : ""}
+      <div class="trail" style="border-top:1px dashed var(--line)">
+        <div class="trail__t" style="color:var(--ink-3)">${ICON.check({s:17})}確認した項目 ${S.answers.length}件</div>
+        <ol>${S.answers.map(a => `<li><p>${esc(a.q)}</p><b style="font-size:var(--t-sm)">${esc(a.l)}</b></li>`).join("")}</ol>
+      </div>
+    </div>`,
+    dock:`<div class="dock">
+      <button class="btn btn--primary" data-sheet>${ICON.check({s:19})}解決した</button>
+      <button class="btn btn--ghost btn--stack" data-go="record-new" data-tree="1">
+        解決しない<small>記録を起票する</small></button>
+    </div>`,
+    overlay: S.sheet ? draftSheet(m, t, r, mins) : ""
+  };
+};
+
+function draftSheet(m, t, r, mins){
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="対応記録の下書き">
+    <button class="sheet__scrim" data-closesheet aria-label="閉じる"></button>
+    <div class="sheet__p">
+      <div class="sheet__g"></div>
+      <div class="sheet__h">
+        <span class="tag tag--clear">${ICON.spark({s:13})}下書きが自動で完成しました</span>
+        <h2>内容を確認して保存するだけです</h2>
+      </div>
+      <div class="sheet__s">
+        <dl class="kv">
+          <div><dt>対象設備</dt><dd class="num">${m.name}（${m.serial}）</dd></div>
+          <div><dt>エラーコード</dt><dd class="num">${t.codes.join(" / ") || "―"}</dd></div>
+          <div><dt>所要時間</dt><dd>${ICON.clock({s:14})}<span class="num">${mins}分</span>（開始→解決を自動計測）</dd></div>
+          <div><dt>担当者</dt><dd>${TENANT.user}（ログイン情報から自動）</dd></div>
+        </dl>
+        <div class="draft">
+          <ul class="checks">${S.answers.map(a => `<li>${ICON.check({s:15})}${esc(a.l)}</li>`).join("")}</ul>
+          <p>上記を確認した上で、${esc(r.draft)}</p>
+        </div>
+        <p class="lead">ツリーで通った確認項目がチェックリストとして入り、その下に処置の文章が続きます。修正が必要な場合は保存後に編集できます。</p>
+      </div>
+      <div class="sheet__a">
+        <button class="btn btn--ghost" data-closesheet>戻る</button>
+        <button class="btn btn--primary" data-save>この内容で保存</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* -------------------------------------------------------------- 動画: 機種 */
+SCREENS.videos = () => ({
+  chrome: statusbar() + bar("動画マニュアル", "機種を選択"),
+  view:`<div class="pad">
+    <label class="search">${ICON.search()}<input placeholder="動画のタイトル・部位で探す" aria-label="動画を検索"></label>
+    <button class="linkrow" data-go="video-list" data-mid="mr100">
+      ${ICON.offline({s:17})}オフライン保存済みの動画（${VIDEOS.filter(v => isSaved(v)).length}件）${ICON.right({s:17})}
+    </button>
+    <div class="label"><span>機種から選ぶ</span><em>${MACHINES.length}件</em></div>
+    <div class="list">
+      ${MACHINES.map(m => `
+        <button class="row" data-go="video-list" data-mid="${m.id}">
+          <span class="mthumb" style="width:74px;flex:none">${ICON.machine()}</span>
+          <span class="row__b"><b class="num">${m.name}</b><p>${esc(m.cat)}・動画 ${m.videos}本</p></span>
+          ${ICON.right({s:18})}
+        </button>`).join("")}
+    </div>
+  </div>`
+});
+
+const isSaved = v => (v.id in S.savedOverride) ? S.savedOverride[v.id] : v.saved;
+
+/* -------------------------------------------------------------- 動画: 一覧 */
+SCREENS["video-list"] = () => {
+  const m = machine(S.p.mid);
+  const all = VIDEOS.filter(v => v.machineId === m.id);
+  const parts = ["すべて", ...new Set(all.map(v => v.part))];
+  const list = S.part === "すべて" ? all : all.filter(v => v.part === S.part);
+  return {
+    chrome: statusbar() + bar(m.name, "部位から動画を選ぶ"),
+    view:`<div class="pad">
+      <div class="chiprow">
+        ${parts.map(p => `<button class="chip chip--sm" data-part="${esc(p)}" data-on="${p === S.part}">${esc(p)}</button>`).join("")}
+      </div>
+      <div class="label"><span>${S.part === "すべて" ? "すべての動画" : esc(S.part)}</span><em>${list.length}件</em></div>
+      ${list.map(v => `
+        <button class="vrow" data-go="player" data-mid="${m.id}" data-vid="${v.id}">
+          <span class="vrow__t">${ICON.play({s:18})}<i>${v.len}</i></span>
+          <span class="vrow__b">
+            <b>${esc(v.title)}</b><span>${esc(v.part)}・チャプター ${v.ch.length}件</span>
+            ${isSaved(v) ? `<span class="tag tag--clear">${ICON.offline({s:12})}オフライン保存済み</span>` : ""}
+          </span>${ICON.right({s:18})}
+        </button>`).join("")}
+    </div>`
+  };
+};
+
+/* ---------------------------------------------------------- 動画: プレイヤー */
+SCREENS.player = () => {
+  const m = machine(S.p.mid), v = video(S.p.vid);
+  const saved = isSaved(v);
+  return {
+    chrome: statusbar() + bar("動画マニュアル", m.name) + `
+      <div class="player">
+        <div class="pstage">
+          <canvas data-film width="640" height="360"></canvas>
+          <span class="pquality">画質 自動（回線状況に応じて切替）</span>
+          <button class="vplay" aria-label="再生">${ICON.play({s:26})}</button>
+        </div>
+        <div class="pbar">
+          <span class="num">${v.ch[S.chapter][0]}</span>
+          <span class="ptrack"><i style="width:${(S.chapter / v.ch.length) * 100 + 7}%"></i></span>
+          <span class="num">${v.len}</span>
+        </div>
+      </div>`,
+    view:`<div class="pad">
+      <h1 style="margin:0;font-size:var(--t-h2);font-weight:900;line-height:1.5">${esc(v.title)}</h1>
+      <p class="lead num" style="margin-top:-6px">${m.name}・${esc(v.part)}・${v.updated} 更新</p>
+      <p style="margin:0;font-size:var(--t-sm);font-weight:600;line-height:1.85;color:var(--ink-2)">${esc(v.sum)}</p>
+      <div class="vacts">
+        <button class="vact" data-savevid="${v.id}" data-on="${saved}">
+          ${saved ? ICON.check({s:18}) : ICON.down2({s:18})}${saved ? "オフライン保存済み" : "オフラインに保存"}
+        </button>
+        <button class="vact">${ICON.share({s:18})}共有</button>
+      </div>
+      <div class="label"><span>チャプター</span><em>${v.ch.length}件</em></div>
+      <div class="list">
+        ${v.ch.map((c,i) => `
+          <button class="chapter" data-chapter="${i}" data-on="${i === S.chapter}">
+            <span class="num">${c[0]}</span><b>${esc(c[1])}</b>${i === S.chapter ? ICON.play({s:14}) : ""}
+          </button>`).join("")}
+      </div>
+      <button class="row list" data-go="record-new">
+        <span class="row__ico">${ICON.record({s:19})}</span>
+        <span class="row__b"><b>この作業を記録に残す</b><p>動画の内容が対応内容の下書きに入ります</p></span>
+        ${ICON.right({s:18})}
+      </button>
+      <p class="lead">${ICON.offline({s:13})} 電波が不安定な場所では、保存済みの動画のみ再生できます。</p>
+    </div>`
+  };
+};
+
+/* -------------------------------------------------------------- 記録: 一覧 */
+SCREENS.records = () => {
+  const filters = ["すべて","未完了","トラブル対応","点検"];
+  const drafts = RECORDS.filter(r => r.st === "draft").length;
+  const list = RECORDS.filter(r =>
+    S.filter === "すべて" ? true : S.filter === "未完了" ? r.st === "draft" : r.kind === S.filter);
+  return {
+    chrome: statusbar() + tabBar("記録", "対応記録・点検チェック"),
+    view:`
+      ${S.toast ? `<div class="toast">${ICON.check({s:18})}対応記録を保存しました（<span class="num">#2026-015</span>）
+        <button data-toastoff>閉じる</button></div>` : ""}
+      <div class="pad">
+        <div class="chiprow">
+          ${filters.map(f => `<button class="chip chip--sm" data-filter="${esc(f)}" data-on="${f === S.filter}">
+            ${esc(f)}${f === "未完了" && drafts ? `<i>${drafts}</i>` : ""}</button>`).join("")}
+        </div>
+        <div class="label"><span>対応記録</span><em>${list.length}件</em></div>
+        ${list.length ? list.map(r => {
+          const st = ST[r.st];
+          return `<button class="rec" data-go="record" data-id="${r.id}">
+            <div class="rec__top"><span class="tag ${st[1]}">${st[0]}</span><span class="rec__id">#${r.id}</span></div>
+            <b class="rec__t">${esc(r.t || "（本文未入力）")}</b>
+            <div class="rec__m"><span class="num">${esc(r.m)}</span><span class="num">${esc(r.at)}</span></div>
+            <div class="rec__f">
+              <span class="tag tag--mute">${esc(r.kind)}</span>
+              ${r.cause !== "―" && r.cause !== "未分類" ? `<span class="tag tag--mute">${esc(r.cause)}</span>` : ""}
+              ${r.down ? `<span class="rec__s">${ICON.clock({s:13})}<span class="num">停止 ${r.down}分</span></span>` : ""}
+              ${r.photos ? `<span class="rec__s">${ICON.camera({s:13})}<span class="num">${r.photos}</span></span>` : ""}
+              ${ICON.right({s:17})}
+            </div>
+          </button>`;
+        }).join("") : `<div class="empty">${ICON.record({s:42})}<b>該当する記録がありません</b><p>条件を変えるか、新しく起票してください。</p></div>`}
+      </div>
+      <button class="fab" data-go="record-new">${ICON.plus({s:20})}記録する</button>`
+  };
+};
+
+/* -------------------------------------------------------------- 記録: 起票 */
+SCREENS["record-new"] = () => {
+  const f = S.form, m = machine(f.mid);
+  const fromTree = S.p.tree === "1";
+  const ready = f.photos > 0 || f.body.trim().length > 0 || f.phrases.length > 0;
+  return {
+    chrome: statusbar() + bar("記録する", fromTree ? "トラブルシューティングから起票" : "30秒で終わります",
+      `<button class="bar__act" data-save>保存</button>`),
+    view:`<div class="pad">
+      ${fromTree ? `<div class="notice notice--signal">${ICON.spark({s:18})}
+        <div><b>draft ready</b><span>ツリーで確認した項目と処置が本文に自動で入りました。内容を確認して保存してください。</span></div></div>` : ""}
+
+      <dl class="card auto" style="margin:0">
+        <div><dt>対象設備</dt>
+          <select data-mid-select aria-label="対象設備">
+            ${MACHINES.map(x => `<option value="${x.id}" ${x.id === f.mid ? "selected" : ""}>${x.name}（${x.serial}）</option>`).join("")}
+          </select>
+          <span class="auto__ico">${ICON.qr({s:19})}</span>
+        </div>
+        <div><dt>発生日時</dt><dd>${ICON.clock({s:15})}<span class="num">2026/07/29 15:26</span></dd><span class="tag tag--mute">自動</span></div>
+        <div><dt>担当者</dt><dd>${ICON.user({s:15})}${TENANT.user}</dd><span class="tag tag--mute">自動</span></div>
+        <div><dt>アワーメーター</dt>
+          <dd>${ICON.gauge({s:15})}<span class="num">${m.id === "mr100" ? "1,412" : "―"} h</span><em>推定</em></dd>
+          <button class="auto__fix" data-hm data-on="${f.hmFixed}">${f.hmFixed ? ICON.check({s:14}) : ""}${f.hmFixed ? "確定済み" : "確定"}</button>
+        </div>
+      </dl>
+
+      <div class="label"><span>1 ／ 写真を撮る</span><em>任意</em></div>
+      <div class="photos">
+        <button class="photo-add" data-photo="+">${ICON.camera({s:24})}カメラ／画像</button>
+        ${Array.from({length:f.photos}, (_,i) => `<span class="photo">${ICON.camera({s:19})}
+          <button data-photo="-" aria-label="写真を削除">×</button></span>`).join("")}
+      </div>
+
+      <div class="label"><span>2 ／ 原因分類をタップ</span>${f.ai ? `<em><span class="tag tag--signal">${ICON.spark({s:12})}AIが推定</span></em>` : ""}</div>
+      <div class="chips">${CAUSES.map(c => `<button class="chip" data-cause="${esc(c)}" data-on="${c === f.cause}">${esc(c)}</button>`).join("")}</div>
+
+      <div class="label"><span>3 ／ 起きたこと・やったこと</span><em>複数選択可</em></div>
+      <div class="chips">${PHRASES.map(p => `<button class="chip" data-phrase="${esc(p)}" data-on="${f.phrases.includes(p)}">
+        ${f.phrases.includes(p) ? ICON.check({s:15}) : ""}${esc(p)}</button>`).join("")}</div>
+
+      <div class="label"><span>対応内容</span><em>文字入力は任意</em></div>
+      <textarea class="textarea" data-body placeholder="タップした内容からAIが下書きします。必要なときだけ直接入力してください。">${esc(f.body)}</textarea>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn--soft btn--sm" style="flex:1" data-ai>${ICON.spark({s:17})}AIで下書き・整形する</button>
+        <button class="btn btn--ghost btn--sm" style="flex:0 0 40%" data-voice>${ICON.mic({s:17})}音声で入力</button>
+      </div>
+      <p class="lead">音声入力は補助機能です。騒音や手袋を想定し、タップのみで完結できます。</p>
+
+      <button class="disclosure" data-detail data-open="${f.detail}">
+        詳しく書く（記録種別・エラーコード・復旧日時）${ICON.down({s:17})}
+      </button>
+      ${f.detail ? `<div class="card card--pad anim" style="display:flex;flex-direction:column;gap:14px">
+        <div><div class="label" style="margin:0 0 8px"><span>記録種別</span></div>
+          <div class="chips">${KINDS.map(k => `<button class="chip chip--sm" data-kind="${esc(k)}" data-on="${k === f.kind}">${esc(k)}</button>`).join("")}</div></div>
+        <div><div class="label" style="margin:0 0 8px"><span>エラーコード</span></div>
+          <input class="input num" value="${fromTree ? "KWP809 / KWP810" : ""}" placeholder="例: E-310"></div>
+        <div><div class="label" style="margin:0 0 8px"><span>復旧日時</span></div>
+          <input class="input num" value="2026/07/29 16:12">
+          <p class="lead" style="margin-top:6px">発生〜復旧の時間は効果報告レポートの集計に使われます。</p></div>
+      </div>` : ""}
+    </div>`,
+    dock:`<div class="dock">
+      <button class="btn btn--ghost" data-save>仮保存</button>
+      <button class="btn btn--primary" data-save ${ready ? "" : "disabled"}>保存する</button>
+    </div>`
+  };
+};
+
+/* -------------------------------------------------------------- 記録: 詳細 */
+SCREENS.record = () => {
+  const r = record(S.p.id), st = ST[r.st];
+  return {
+    chrome: statusbar() + bar(`#${r.id}`, r.kind),
+    view:`<div class="pad">
+      <span class="tag ${st[1]}" style="align-self:flex-start">${st[0]}</span>
+      <h1 style="margin:0;font-size:var(--t-h1);font-weight:900;line-height:1.5">${esc(r.t || "（本文未入力）")}</h1>
+      ${r.from ? `<div class="notice notice--signal">${ICON.gearsearch({s:18})}
+        <div><b>from troubleshooting</b><span>${esc(r.from)}</span></div></div>` : ""}
+      <dl class="kv">
+        <div><dt>対象設備</dt><dd class="num">${esc(r.m)}</dd></div>
+        <div><dt>発生日時</dt><dd>${ICON.clock({s:14})}<span class="num">${r.at}</span></dd></div>
+        ${r.fixed ? `<div><dt>復旧日時</dt><dd>${ICON.check({s:14})}<span class="num">${r.fixed}</span></dd></div>` : ""}
+        ${r.down ? `<div><dt>停止時間</dt><dd class="num">${r.down}分</dd></div>` : ""}
+        <div><dt>担当者</dt><dd>${ICON.user({s:14})}${esc(r.who)}</dd></div>
+        <div><dt>アワーメーター</dt><dd>${ICON.gauge({s:14})}<span class="num">${r.hm.toLocaleString()} h</span></dd></div>
+        <div><dt>分類</dt><dd>${esc(r.genre)}・${esc(r.cause)}</dd></div>
+      </dl>
+      <div class="label"><span>対応内容</span>${r.checks ? `<em><span class="tag tag--signal">${ICON.spark({s:12})}自動生成</span></em>` : ""}</div>
+      <div class="card card--pad">
+        ${r.checks ? `<ul class="checks">${r.checks.map(c => `<li>${ICON.check({s:15})}${esc(c)}</li>`).join("")}</ul>` : ""}
+        <p style="margin:0;font-size:var(--t-body);font-weight:600;line-height:1.95">${esc(r.body || "本文は未入力です。写真のみ仮保存されています。")}</p>
+      </div>
+      ${r.photos ? `<div class="label"><span>写真</span><em>${r.photos}件</em></div>
+        <div class="photos">${Array.from({length:r.photos}, () => `<span class="photo" style="width:88px;height:88px">${ICON.camera({s:19})}</span>`).join("")}</div>` : ""}
+      <div class="label"><span>出力・共有</span></div>
+      <div class="list">
+        <button class="row"><span class="row__ico">${ICON.pdf({s:19})}</span>
+          <span class="row__b"><b>PDF報告書を作成</b><p>アプリ内で完結。写真つきで出力されます</p></span>${ICON.right({s:18})}</button>
+        <button class="row"><span class="row__ico">${ICON.share({s:19})}</span>
+          <span class="row__b"><b>メーカーに共有</b><p>原因追究の依頼として送信します</p></span>${ICON.right({s:18})}</button>
+      </div>
+      ${r.st === "draft" ? `<button class="btn btn--primary" data-go="record-new">続きを書く</button>` : ""}
+    </div>`
+  };
+};
+
+/* ------------------------------------------------------------------ 資料集 */
+SCREENS.docs = () => {
+  const q = S.query.trim().toLowerCase();
+  const hits = q ? TOPICS.filter(t =>
+    [t.title, t.sum, t.ch, ...t.tags, ...t.codes].join(" ").toLowerCase().includes(q)) : null;
+  const favs = TOPICS.filter(isFav);
+  const chapters = [...new Set(TOPICS.map(t => t.ch))];
+  const rows = list => `<div class="list">${list.map(topicRow).join("")}</div>`;
+  return {
+    chrome: statusbar() + tabBar("資料集", "MR100 ・ 元取説 第4版"),
+    view:`<div class="pad">
+      <label class="search">${ICON.search()}
+        <input data-q value="${esc(S.query)}" placeholder="エラーコード・キーワードで検索" aria-label="資料を検索">
+        ${S.query ? `<button data-qclear aria-label="検索をクリア">×</button>` : ""}
+      </label>
+      <div class="chiprow">
+        ${["KWP809","KWP810","E-310","KWP812"].map(c => `
+          <button class="chip chip--sm num" data-qset="${c}">${ICON.alert({s:13})}${c}</button>`).join("")}
+      </div>
+      ${hits ? `
+        <div class="label"><span>検索結果</span><em>${hits.length}件</em></div>
+        ${hits.length ? rows(hits) : `<div class="empty">${ICON.search({s:42})}<b>該当する項目がありません</b>
+          <p>別のキーワードやエラーコードで試してください。</p></div>`}
+      ` : `
+        ${favs.length ? `<div class="label"><span>お気に入り</span><em>オフラインで読めます</em></div>${rows(favs)}` : ""}
+        ${chapters.map(ch => `<div class="label"><span>${esc(ch)}</span><em>${TOPICS.filter(t => t.ch === ch).length}件</em></div>
+          ${rows(TOPICS.filter(t => t.ch === ch))}`).join("")}`}
+    </div>`
+  };
+};
+const isFav = t => (t.id in S.favOverride) ? S.favOverride[t.id] : t.fav;
+const topicRow = t => `
+  <button class="row" data-go="topic" data-id="${t.id}">
+    <span class="row__b">
+      <b>${isFav(t) ? `<span style="color:var(--caution);margin-right:5px">${ICON.starOn({s:14})}</span>` : ""}${esc(t.title)}</b>
+      <p>${esc(t.sum)}</p>
+      ${(t.codes.length || t.off) ? `<span style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+        ${t.codes.map(c => `<span class="tag tag--code">${c}</span>`).join("")}
+        ${t.off ? `<span class="tag tag--clear">${ICON.offline({s:11})}保存済み</span>` : ""}</span>` : ""}
+    </span>${ICON.right({s:18})}
+  </button>`;
+
+SCREENS.topic = () => {
+  const t = topic(S.p.id);
+  const v = t.video ? video(t.video) : null;
+  const tr = t.tree ? tree(t.tree) : null;
+  const heads = t.blocks.filter(b => b.t === "h");
+  const fav = isFav(t);
+  return {
+    chrome: statusbar() + bar(t.ch, t.ed,
+      `<button class="bar__act" data-fav="${t.id}" aria-pressed="${fav}">
+        ${fav ? ICON.starOn({s:17}) : ICON.star({s:17})}${fav ? "保存中" : "お気に入り"}</button>`),
+    view:`<div class="pad">
+      <h1 class="topic-h">${esc(t.title)}</h1>
+      <div class="chips">
+        ${t.codes.map(c => `<span class="tag tag--code">${c}</span>`).join("")}
+        ${t.tags.map(x => `<span class="tag tag--mute">#${esc(x)}</span>`).join("")}
+        ${t.off ? `<span class="tag tag--clear">${ICON.offline({s:12})}オフライン保存済み</span>` : ""}
+      </div>
+      ${heads.length > 1 ? `<nav class="toc"><b>in this topic</b>
+        ${heads.map(h => `<a href="#h-${encodeURIComponent(h.b)}">${esc(h.b)}</a>`).join("")}</nav>` : ""}
+      <div class="doc">
+        ${t.blocks.map(b => {
+          if(b.t === "h") return `<h2 id="h-${encodeURIComponent(b.b)}">${esc(b.b)}</h2>`;
+          if(b.t === "p") return `<p>${esc(b.b)}</p>`;
+          if(b.t === "steps") return `<ol>${b.items.map((s,i) => `<li><span>${i+1}</span>${esc(s)}</li>`).join("")}</ol>`;
+          if(b.t === "table") return `<div class="tablewrap"><table><thead><tr>${b.head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead>
+            <tbody>${b.rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+          if(b.t === "fig") return `<figure class="figure"><div class="figbox">タップで拡大（ダウンロード不可）</div>
+            <figcaption>${esc(b.b)}</figcaption></figure>`;
+          if(b.t === "halt" || b.t === "caution") return `<div class="notice notice--${b.t}">${ICON.alert({s:18})}
+            <div><b>${esc(b.l)}</b><span>${esc(b.b)}</span></div></div>`;
+          return "";
+        }).join("")}
+      </div>
+      ${(v || tr) ? `<div class="label"><span>関連リンク</span></div><div class="list">
+        ${v ? `<button class="row" data-go="player" data-mid="${v.machineId}" data-vid="${v.id}">
+          <span class="row__ico">${ICON.playgear({s:19})}</span>
+          <span class="row__b"><b>${esc(v.title)}</b><p>動画マニュアル・${v.len}</p></span>${ICON.right({s:18})}</button>` : ""}
+        ${tr ? `<button class="row" data-go="ts-run" data-mid="${tr.machineId}" data-tid="${tr.id}">
+          <span class="row__ico">${ICON.gearsearch({s:19})}</span>
+          <span class="row__b"><b>${esc(tr.title)}</b><p>トラブルシューティング・STEP ${tr.depth}問</p></span>${ICON.right({s:18})}</button>` : ""}
+      </div>` : ""}
+      <p class="source">${esc(t.ed)}</p>
+    </div>`
+  };
+};
+
+/* ---------------------------------------------------------------- メニュー */
+SCREENS.menu = () => {
+  const mine = RECORDS.filter(r => r.who === TENANT.user);
+  const withDown = RECORDS.filter(r => r.down);
+  const avg = Math.round(withDown.reduce((s,r) => s + r.down, 0) / Math.max(1, withDown.length));
+  const theme = document.documentElement.getAttribute("data-theme") || "light";
+  return {
+    chrome: statusbar() + tabBar("メニュー", TENANT.name),
+    view:`<div class="pad">
+      <div class="profile">
+        <span class="profile__a">${ICON.user({s:24})}</span>
+        <div><b>${TENANT.user}</b><span>${TENANT.role}・${TENANT.name}</span></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>${mine.length}</b><span>今月の対応件数</span></div>
+        <div class="stat"><b>${avg}<small style="font-size:12px">分</small></b><span>平均復旧時間</span></div>
+        <div class="stat"><b>${RECORDS.filter(r => r.st === "draft").length}</b><span>未完了の記録</span></div>
+      </div>
+
+      <div class="label"><span>表示</span><em>屋外・暗所での見やすさ</em></div>
+      <div class="card card--pad" style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <div class="label" style="margin:0 0 7px"><span>画面の明るさ</span></div>
+          <div class="seg">
+            <button data-theme-set="light" data-on="${theme === "light"}">明るい場所</button>
+            <button data-theme-set="dark" data-on="${theme === "dark"}">暗所・夜間</button>
+          </div>
+        </div>
+        <div>
+          <div class="label" style="margin:0 0 7px"><span>文字サイズ</span></div>
+          <div class="seg">
+            <button data-size="標準" data-on="${S.size === "標準"}">標準</button>
+            <button data-size="大きい" data-on="${S.size === "大きい"}">大きい</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="label"><span>アプリ</span></div>
+      <div class="list">
+        <button class="row" data-go="notices"><span class="row__ico">${ICON.bell({s:19})}</span>
+          <span class="row__b"><b>お知らせ</b><p>新しいトラブルシューティングの公開など</p></span>
+          ${unread() ? `<span class="tag" style="background:var(--halt);color:#fff">${unread()}</span>` : ""}${ICON.right({s:18})}</button>
+        <button class="row"><span class="row__ico">${ICON.offline({s:19})}</span>
+          <span class="row__b"><b>オフライン設定</b><p>お気に入り項目3件・動画2件を保存中／最終同期 08:02</p></span>${ICON.right({s:18})}</button>
+        <button class="row"><span class="row__ico">${ICON.pdf({s:19})}</span>
+          <span class="row__b"><b>PDF報告書の書式</b><p>出力する項目・ロゴの設定</p></span>${ICON.right({s:18})}</button>
+      </div>
+
+      <div class="label"><span>アカウント</span></div>
+      <div class="list">
+        <button class="row"><span class="row__ico">${ICON.user({s:19})}</span>
+          <span class="row__b"><b>アカウント情報</b><p>${TENANT.user}・パスワード変更</p></span>${ICON.right({s:18})}</button>
+        <button class="row"><span class="row__ico">${ICON.clock({s:19})}</span>
+          <span class="row__b"><b>ヘルプ・お問い合わせ</b><p>使い方とメーカーへの連絡先</p></span>${ICON.right({s:18})}</button>
+      </div>
+      <p class="version">TOMARUN v1.0.0 ― 生産を、止めない。</p>
+    </div>`
+  };
+};
+
+/* ==========================================================================
+   描画
+   ========================================================================== */
+function render(){
+  const out = SCREENS[S.screen]();
+  el.chrome.innerHTML = out.chrome !== undefined ? out.chrome : "";
+  el.view.dataset.screen = S.screen;
+  el.view.innerHTML = out.view || "";
+  el.dock.innerHTML = out.dock || "";
+  el.overlay.innerHTML = out.overlay || "";
+
+  el.tabs.innerHTML = TABS.map(t => `
+    <button class="tab" data-tab="${t.k}" data-on="${t.is(S.screen)}" ${t.is(S.screen) ? 'aria-current="page"' : ""}>
+      ${ICON[t.icon]({s:23})}${t.label}
+    </button>`).join("");
+
+  el.rail.innerHTML = RAIL.map(([g, items]) => `
+    <div class="rail__group">${g}</div>
+    ${items.map(([k,l]) => `<button class="rail__item" data-jump="${k}" data-on="${k === S.screen}">${l}</button>`).join("")}`).join("");
+
+  paintCanvases();
+}
+
+/* 装飾グラフィックはCanvasで描く（長いSVGパスを手書きしない） */
+function paintCanvases(){
+  const hero = el.view.querySelector("[data-hero]");
+  if(hero) paintHero(hero);
+  document.querySelectorAll("[data-film]").forEach(paintFilm);
+}
+function paintHero(cv){
+  const g = cv.getContext("2d"), w = cv.width, h = cv.height;
+  const grad = g.createLinearGradient(0,0,w,h);
+  grad.addColorStop(0,"#111a2b"); grad.addColorStop(.55,"#16233d"); grad.addColorStop(1,"#0d1220");
+  g.fillStyle = grad; g.fillRect(0,0,w,h);
+  // 計器のグリッド
+  g.strokeStyle = "rgba(126,166,255,.10)"; g.lineWidth = 1;
+  for(let x = 0; x <= w; x += 40){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,h); g.stroke(); }
+  for(let y = 0; y <= h; y += 40){ g.beginPath(); g.moveTo(0,y); g.lineTo(w,y); g.stroke(); }
+  // 稼働を示す同心円
+  g.strokeStyle = "rgba(126,166,255,.22)";
+  [70,120,175].forEach(r => { g.beginPath(); g.arc(w*.82, h*.28, r, 0, Math.PI*2); g.stroke(); });
+  // 斜めのプレート
+  g.fillStyle = "rgba(31,95,224,.30)";
+  g.beginPath(); g.moveTo(0,0); g.lineTo(w*.34,0); g.lineTo(0,h*.62); g.closePath(); g.fill();
+  g.fillStyle = "rgba(31,95,224,.16)";
+  g.beginPath(); g.moveTo(w,h); g.lineTo(w*.62,h); g.lineTo(w,h*.34); g.closePath(); g.fill();
+  // 停止していないことを示すドット列
+  g.fillStyle = "rgba(160,190,255,.4)";
+  for(let r = 0; r < 5; r++) for(let c = 0; c < 9; c++){
+    g.beginPath(); g.arc(w*.66 + c*13, 30 + r*13, 1.8, 0, Math.PI*2); g.fill();
+  }
+}
+function paintFilm(cv){
+  const g = cv.getContext("2d"), w = cv.width, h = cv.height;
+  const grad = g.createLinearGradient(0,0,w,h);
+  grad.addColorStop(0,"#3a5f9c"); grad.addColorStop(1,"#0f1725");
+  g.fillStyle = grad; g.fillRect(0,0,w,h);
+  g.strokeStyle = "rgba(255,255,255,.10)"; g.lineWidth = 2;
+  for(let i = -h; i < w; i += 26){ g.beginPath(); g.moveTo(i,h); g.lineTo(i+h,0); g.stroke(); }
+  g.fillStyle = "rgba(8,12,20,.28)"; g.fillRect(0,h*.62,w,h*.38);
+}
+
+/* ==========================================================================
+   操作
+   ========================================================================== */
+el.app.addEventListener("click", e => {
+  const t = e.target;
+  const hit = sel => t.closest(sel);
+  let n;
+
+  if((n = hit("[data-back]"))) return back();
+  if((n = hit("[data-tab]"))){ S.stack = []; S.screen = n.dataset.tab; S.p = {}; onEnter(); render(); el.view.scrollTop = 0; return; }
+
+  if((n = hit("[data-go]"))){
+    const s = n.dataset.go;
+    const p = {};
+    if(n.dataset.mid) p.mid = n.dataset.mid;
+    if(n.dataset.tid) p.tid = n.dataset.tid;
+    if(n.dataset.vid) p.vid = n.dataset.vid;
+    if(n.dataset.id)  p.id  = n.dataset.id;
+    if(n.dataset.tree) p.tree = n.dataset.tree;
+    if(s === "ts-run"){ S.cursor = tree(p.tid).root; S.answers = []; S.trailOpen = false; S.haltStart = null; }
+    if(s === "video-list") S.part = "すべて";
+    if(s === "player") S.chapter = 0;
+    if(s === "record-new") S.form = { mid:p.mid || "mr100", cause:p.tree ? "破損" : "", phrases:[], photos:0,
+      body:p.tree ? "エラーコード KWP809/810 の検出を確認した上で、DPF差圧センサーを交換。交換後、診断機でサービスルーチンを実行し、正常完了することを確認した。" : "",
+      hmFixed:false, detail:false, kind:"トラブル対応", ai:!!p.tree };
+    return go(s, p);
+  }
+
+  /* 質問 */
+  if((n = hit("[data-answer]"))){
+    const t2 = tree(S.p.tid), node = t2.nodes[S.cursor], a = node.a[+n.dataset.answer];
+    S.answers.push({id:node.id, q:node.q, l:a.l});
+    S.cursor = a.n; S.trailOpen = false;
+    return render();
+  }
+  if(hit("[data-trail]")){ S.trailOpen = !S.trailOpen; return render(); }
+  if((n = hit("[data-rewind]"))){
+    const i = +n.dataset.rewind;
+    S.cursor = S.answers[i].id; S.answers = S.answers.slice(0,i); S.trailOpen = false;
+    return render();
+  }
+  if(hit("[data-undo]")){
+    if(!S.answers.length) return back();
+    const last = S.answers.pop(); S.cursor = last.id; return render();
+  }
+  if(hit("[data-sheet]")){ S.sheet = true; return render(); }
+  if(hit("[data-closesheet]")){ S.sheet = false; return render(); }
+  if(hit("[data-save]")){
+    S.sheet = false; S.toast = true; S.stack = []; S.screen = "records"; S.p = {};
+    onEnter(); render(); el.view.scrollTop = 0;
+    setTimeout(() => { if(S.toast){ S.toast = false; if(S.screen === "records") render(); } }, 4200);
+    return;
+  }
+  if(hit("[data-toastoff]")){ S.toast = false; return render(); }
+
+  /* 動画 */
+  if((n = hit("[data-part]"))){ S.part = n.dataset.part; return render(); }
+  if((n = hit("[data-chapter]"))){ S.chapter = +n.dataset.chapter; return render(); }
+  if((n = hit("[data-savevid]"))){ const id = n.dataset.savevid; S.savedOverride[id] = !isSaved(video(id)); return render(); }
+
+  /* 記録 */
+  if((n = hit("[data-filter]"))){ S.filter = n.dataset.filter; return render(); }
+  if((n = hit("[data-cause]"))){ S.form.cause = n.dataset.cause; return render(); }
+  if((n = hit("[data-kind]"))){ S.form.kind = n.dataset.kind; return render(); }
+  if((n = hit("[data-phrase]"))){
+    const p = n.dataset.phrase, list = S.form.phrases;
+    S.form.phrases = list.includes(p) ? list.filter(x => x !== p) : [...list, p];
+    return render();
+  }
+  if((n = hit("[data-photo]"))){
+    S.form.photos = Math.max(0, S.form.photos + (n.dataset.photo === "+" ? 1 : -1));
+    return render();
+  }
+  if(hit("[data-hm]")){ S.form.hmFixed = true; return render(); }
+  if(hit("[data-detail]")){ S.form.detail = !S.form.detail; return render(); }
+  if(hit("[data-ai]")){
+    const src = [S.form.body, ...S.form.phrases].filter(Boolean).join("。").replace(/。+$/,"");
+    S.form.body = src ? src + "。以上の対応により復旧を確認した。"
+      : "写真の内容から、対象部位に異常を確認。清掃・調整を実施し、試運転で正常動作を確認した。";
+    S.form.cause = S.form.cause || "摩耗";
+    S.form.ai = true;
+    return render();
+  }
+  if(hit("[data-voice]")){
+    S.form.body = (S.form.body ? S.form.body + " " : "") + "（音声入力）加工中に主軸から異音、エラー表示で停止した。";
+    return render();
+  }
+
+  /* 資料集 */
+  if((n = hit("[data-qset]"))){ S.query = n.dataset.qset; return render(); }
+  if(hit("[data-qclear]")){ S.query = ""; return render(); }
+  if((n = hit("[data-fav]"))){ const id = n.dataset.fav; S.favOverride[id] = !isFav(topic(id)); return render(); }
+
+  /* 設定 */
+  if((n = hit("[data-theme-set]"))){
+    document.documentElement.setAttribute("data-theme", n.dataset.themeSet);
+    return render();
+  }
+  if((n = hit("[data-size]"))){
+    S.size = n.dataset.size;
+    document.documentElement.style.setProperty("--f", S.size === "大きい" ? "1.12" : "1");
+    return render();
+  }
+});
+
+el.app.addEventListener("input", e => {
+  if(e.target.matches("[data-body]")) S.form.body = e.target.value;
+  if(e.target.matches("[data-q]")){
+    S.query = e.target.value;
+    const pos = e.target.selectionStart;
+    render();
+    const again = el.view.querySelector("[data-q]");
+    if(again){ again.focus(); again.setSelectionRange(pos, pos); }
+  }
+});
+el.app.addEventListener("change", e => {
+  if(e.target.matches("[data-mid-select]")){ S.form.mid = e.target.value; render(); }
+});
+
+document.addEventListener("click", e => {
+  const n = e.target.closest("[data-jump]");
+  if(n) jump(n.dataset.jump);
+});
+
+/* OSのテーマ設定を初期値にする */
+if(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches){
+  document.documentElement.setAttribute("data-theme","dark");
+}
+render();
+</script>
+</body>
+</html>
