@@ -1,3 +1,38 @@
+# Watapp
+
+このリポジトリには 2 つのアプリが入っています。
+
+| パス | アプリ | 説明 |
+| --- | --- | --- |
+| `/` | Watapp | プライベートメッセンジャー（チャット・通話） |
+| `/pm` | **TOMARUN コマンドセンター** | 事業推進のための統合管理ツール |
+
+## TOMARUN コマンドセンター（`/pm`）
+
+TOMARUN の営業・展示会・マーケティング・資金調達・プロダクト開発を
+1つの画面で管理するツールです。13 のモジュールで構成されています。
+
+ダッシュボード / ガントチャート / タスクボード / OKR・KPI / 商談パイプライン /
+トークスクリプト / 営業資料ライブラリ / ROIシミュレーター / 展示会マネジメント /
+マーケ施策・記事 / 業界ニュース（1日2回自動収集） / 資金調達 / ナレッジ・リスク
+
+**→ 詳しい使い方は [docs/TOMARUN-COMMAND-CENTER.md](docs/TOMARUN-COMMAND-CENTER.md) を参照してください。**
+
+### 起動
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+- チャットアプリ: http://localhost:3000
+- コマンドセンター: http://localhost:3000/pm
+
+データは `data/pm-state.json` に保存されます（Git 管理外）。
+
+---
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
