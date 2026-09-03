@@ -270,5 +270,41 @@ app.prepare().then(() => {
 
   httpServer.listen(port, hostname, () => {
     console.log(`> サーバー起動: http://${hostname}:${port}`);
+    startNewsScheduler();
   });
 });
+
+// 業界ニュースの自動収集スケジューラ（1日2回: 8:00 / 18:00 JST）
+// 誰もアクセスしていない時間帯でも収集されるよう、サーバー側からAPIを叩く。
+function startNewsScheduler() {
+  const SLOTS = [8, 18]; // JST の時刻
+  const CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10分ごとにスロット到来を確認
+  let lastRunSlotKey = null;
+
+  const currentSlotKey = () => {
+    const jst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const hour = jst.getUTCHours();
+    const slot = SLOTS.filter((h) => hour >= h).pop();
+    if (slot === undefined) return null;
+    return `${jst.getUTCFullYear()}-${jst.getUTCMonth()}-${jst.getUTCDate()}-${slot}`;
+  };
+
+  const run = async () => {
+    const key = currentSlotKey();
+    if (!key || key === lastRunSlotKey) return;
+    lastRunSlotKey = key;
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/pm/newsfeed/refresh`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      console.log(`> ニュース自動収集 [${key}]: ${json.meta?.lastResult ?? "完了"}`);
+    } catch (err) {
+      console.warn(`> ニュース自動収集に失敗: ${err.message}`);
+    }
+  };
+
+  // 起動直後に1回、その後は10分ごとにスロット到来をチェック
+  setTimeout(run, 15_000);
+  setInterval(run, CHECK_INTERVAL_MS).unref?.();
+}
